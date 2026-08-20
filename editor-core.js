@@ -167,7 +167,11 @@ export function alignElementToPage(element, pageSize, mode) {
 
 export function constrainMoveDelta(dx, dy, shiftKey) {
   if (!shiftKey) return { dx, dy };
-  return Math.abs(dx) >= Math.abs(dy) ? { dx, dy: 0 } : { dx: 0, dy };
+  if (!dx && !dy) return { dx: 0, dy: 0 };
+  const step = Math.PI / 4, angle = Math.round(Math.atan2(dy, dx) / step) * step;
+  const unitX = Math.cos(angle), unitY = Math.sin(angle), distance = dx * unitX + dy * unitY;
+  const clean = value => Math.abs(value) < 1e-10 ? 0 : Number(value.toFixed(12));
+  return { dx: clean(unitX * distance), dy: clean(unitY * distance) };
 }
 
 export function calculatePanScroll(startScroll, startPointer, currentPointer) {
@@ -220,10 +224,21 @@ function axisPointOnSegment(point, segment, axis, anchor) {
   return nearestPointOnSegment(point, segment);
 }
 
+function directionPointOnSegment(point, segment, direction, anchor) {
+  const [start, end] = segment, segmentDirection = { x: end.x - start.x, y: end.y - start.y }, epsilon = 1e-7;
+  const cross = (first, second) => first.x * second.y - first.y * second.x;
+  const denominator = cross(direction, segmentDirection), offset = { x: start.x - anchor.x, y: start.y - anchor.y };
+  if (Math.abs(denominator) < epsilon) return Math.abs(cross(offset, direction)) < epsilon ? nearestPointOnSegment(point, segment) : null;
+  const amount = cross(offset, direction) / denominator;
+  if (amount < 0 || amount > 1) return null;
+  const travel = cross(offset, segmentDirection) / denominator;
+  return { point: { x: anchor.x + direction.x * travel, y: anchor.y + direction.y * travel }, amount };
+}
+
 export function snapPointToSegments(point, segments = [], tolerance = 8, options = {}) {
   let bestEndpoint = null, bestEdge = null;
   for (let index = 0; index < segments.length; index += 1) {
-    const candidate = axisPointOnSegment(point, segments[index], options.axis, options.anchor);
+    const candidate = options.direction&&options.anchor?directionPointOnSegment(point, segments[index],options.direction,options.anchor):axisPointOnSegment(point, segments[index], options.axis, options.anchor);
     if (!candidate) continue;
     const distance = Math.hypot(point.x - candidate.point.x, point.y - candidate.point.y);
     const endpoint = candidate.amount <= 1e-7 || candidate.amount >= 1 - 1e-7;
@@ -231,7 +246,7 @@ export function snapPointToSegments(point, segments = [], tolerance = 8, options
     if (distance <= tolerance && endpoint && (!bestEndpoint || distance < bestEndpoint.distance)) bestEndpoint = result;
     if (distance <= tolerance && !endpoint && (!bestEdge || distance < bestEdge.distance)) bestEdge = result;
 
-    if (!options.axis) {
+    if (!options.axis&&!options.direction) {
       for (const endpointPoint of segments[index]) {
         const endpointDistance = Math.hypot(point.x - endpointPoint.x, point.y - endpointPoint.y);
         if (endpointDistance <= tolerance && (!bestEndpoint || endpointDistance < bestEndpoint.distance)) bestEndpoint = { point: { ...endpointPoint }, distance: endpointDistance, segmentIndex: index, type: "endpoint" };
@@ -395,7 +410,8 @@ export function shortcutCommand(event) {
   if (event.key === "F1") return "show-shortcuts";
   if (event.key === "+" || event.key === "=") return "zoom-in";
   if (event.key === "-") return "zoom-out";
-  return ({ v: "select", h: "highlight", t: "insert", e: "edit" })[key] || null;
+  if (shift) return ({ e: "edit", p: "markup-polygon" })[key] || null;
+  return ({ v: "select", h: "highlight", t: "insert", c: "markup-cloud", a: "markup-arrow", r: "markup-rectangle", e: "markup-ellipse", l: "markup-line" })[key] || null;
 }
 
 export function calculateFitScale(pageSize, areaSize, layoutMode, fitMode) {
@@ -419,6 +435,11 @@ export function pageNumberLabel(descriptor, index) {
 export function pointDistance(first, second) {
   if (!first || !second) return 0;
   return Math.hypot(second.x - first.x, second.y - first.y);
+}
+
+export function removeControlPoint(points = [], index, minimumPoints = 3) {
+  if (!Array.isArray(points) || points.length <= minimumPoints || !Number.isInteger(index) || index < 0 || index >= points.length) return null;
+  return points.filter((_, pointIndex) => pointIndex !== index).map(point => ({ ...point }));
 }
 
 export function polylineDistance(points = [], closed = false) {
