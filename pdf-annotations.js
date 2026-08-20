@@ -15,14 +15,22 @@ const numberText = value => String(Math.round(Number(value) * 1000) / 1000);
 const colorText = color => color.map(numberText).join(" ");
 const escapePdfText = value => String(value ?? "").replace(/[^\x20-\x7e]/g, character => character === "²" ? "^2" : "?").replace(/([\\()])/g, "\\$1");
 
-function appearanceFont(PDFLib, page) {
+function appearanceFontName(annotation) {
+  const bold=Number.parseInt(annotation?.fontWeight,10)>=600||/bold/i.test(annotation?.fontWeight||""),italic=/italic|oblique/i.test(annotation?.fontStyle||"");
+  return bold?(italic?"HelvBI":"HelvB"):(italic?"HelvI":"Helv");
+}
+
+function appearanceFont(PDFLib, page, fontName="Helv") {
   const context = page.doc.context, name = value => PDFLib.PDFName.of(value);
-  let reference = appearanceFontRefs.get(page.doc);
+  let references = appearanceFontRefs.get(page.doc);
+  if (!references) { references=new Map();appearanceFontRefs.set(page.doc,references); }
+  let reference = references.get(fontName);
   if (!reference) {
-    reference = context.register(context.obj({ Type: name("Font"), Subtype: name("Type1"), BaseFont: name("Helvetica"), Encoding: name("WinAnsiEncoding") }));
-    appearanceFontRefs.set(page.doc, reference);
+    const baseFont=({Helv:"Helvetica",HelvB:"Helvetica-Bold",HelvI:"Helvetica-Oblique",HelvBI:"Helvetica-BoldOblique"})[fontName]||"Helvetica";
+    reference = context.register(context.obj({ Type: name("Font"), Subtype: name("Type1"), BaseFont: name(baseFont), Encoding: name("WinAnsiEncoding") }));
+    references.set(fontName,reference);
   }
-  page.node.setFontDictionary(name("Helv"),reference);
+  page.node.setFontDictionary(name(fontName),reference);
   return reference;
 }
 
@@ -72,12 +80,13 @@ function annotationAppearance(PDFLib, page, spec) {
   else if(["Polygon","PolyLine"].includes(spec.subtype)&&spec.vertices){const points=localPoints(spec.vertices,rect);if(spec.intent==="PolygonCloud")commands.push(`${cloudPath(width,height,inset)} ${paint}`);else{commands.push(`${numberText(points[0].x)} ${numberText(points[0].y)} m`);for(const point of points.slice(1))commands.push(`${numberText(point.x)} ${numberText(point.y)} l`);if(spec.subtype==="Polygon")commands.push("h");commands.push(paint);}}
   else if(spec.subtype==="Ink"&&spec.inkList){for(const values of spec.inkList){const points=localPoints(values,rect);commands.push(`${numberText(points[0].x)} ${numberText(points[0].y)} m`);for(const point of points.slice(1))commands.push(`${numberText(point.x)} ${numberText(point.y)} l`);commands.push("S");}}
   else if(spec.subtype==="Highlight"&&spec.quadPoints){commands.push(`${colorText(blendRgbWithWhite(spec.color||[1,.85,.3],.38))} rg`);for(let index=0;index<spec.quadPoints.length;index+=8){const points=localPoints(spec.quadPoints.slice(index,index+8),rect);commands.push(`${numberText(points[0].x)} ${numberText(points[0].y)} m ${numberText(points[1].x)} ${numberText(points[1].y)} l ${numberText(points[3].x)} ${numberText(points[3].y)} l ${numberText(points[2].x)} ${numberText(points[2].y)} l h f`);}}
+  else if(spec.subtype==="FreeText"&&spec.flag){const notch=Math.min(width*.28,height*.55),path=`${numberText(notch)} ${numberText(inset)} m ${numberText(width-inset)} ${numberText(inset)} l ${numberText(width-inset)} ${numberText(height-inset)} l ${numberText(notch)} ${numberText(height-inset)} l ${numberText(inset)} ${numberText(height/2)} l h`;commands.push(`${path} ${paint}`);}
   else if(spec.subtype==="FreeText"&&(fill||spec.width>0))commands.push(`${numberText(inset)} ${numberText(inset)} ${numberText(Math.max(0,width-lineWidth))} ${numberText(Math.max(0,height-lineWidth))} re ${paint}`);
   const textValue=spec.subtype==="FreeText"?spec.contents:(spec.measure&&spec.contents?spec.contents:"");
-  let usesFont=false;
-  if(textValue){const size=spec.defaultAppearance?.size||Math.min(10,Math.max(6,height/5)),textColor=spec.defaultAppearance?.color||stroke,lines=wrapAppearanceText(textValue,width,size,height);usesFont=true;commands.push("BT",`${colorText(textColor)} rg`,`/Helv ${numberText(size)} Tf`);lines.forEach((line,index)=>commands.push(`1 0 0 1 4 ${numberText(height-size-4-index*size*1.18)} Tm (${escapePdfText(line)}) Tj`));commands.push("ET");}
+  let usesFont=false,fontName=spec.defaultAppearance?.font||"Helv";
+  if(textValue){const size=spec.defaultAppearance?.size||Math.min(10,Math.max(6,height/5)),textColor=spec.defaultAppearance?.color||stroke,textLeft=spec.flag?Math.min(width*.28,height*.55)+4:4,textRight=width-4,lines=wrapAppearanceText(textValue,textRight-textLeft,size,height),lineHeight=size*1.18,contentHeight=lines.length*lineHeight,vertical=spec.verticalAlign||"top",firstY=vertical==="middle"?(height+contentHeight)/2-size:vertical==="bottom"?contentHeight-size+4:height-size-4,underlines=[];usesFont=true;commands.push("BT",`${colorText(textColor)} rg`,`/${fontName} ${numberText(size)} Tf`);lines.forEach((line,index)=>{const estimatedWidth=line.length*size*.55,x=spec.textAlign==="center"?(textLeft+textRight-estimatedWidth)/2:spec.textAlign==="right"?textRight-estimatedWidth:textLeft,y=firstY-index*lineHeight;commands.push(`1 0 0 1 ${numberText(x)} ${numberText(y)} Tm (${escapePdfText(line)}) Tj`);if(spec.textUnderline)underlines.push(`${numberText(x)} ${numberText(y-1.5)} m ${numberText(x+estimatedWidth)} ${numberText(y-1.5)} l S`);});commands.push("ET");if(underlines.length)commands.push(`${colorText(textColor)} RG`,`${numberText(Math.max(.6,size/16))} w`,...underlines);}
   commands.push("Q");
-  const resources=usesFont?{Font:{Helv:appearanceFont(PDFLib,page)}}:{};
+  const resources=usesFont?{Font:{[fontName]:appearanceFont(PDFLib,page,fontName)}}:{};
   return context.register(context.flateStream(commands.filter(Boolean).join("\n"),{Type:"XObject",Subtype:"Form",FormType:1,BBox:context.obj([0,0,width,height]),Matrix:context.obj([1,0,0,1,0,0]),Resources:resources}));
 }
 
@@ -107,6 +116,7 @@ function measureSpec(annotation) {
 function markupSpec(annotation, pageHeight) {
   const points = annotation.points || [];if (points.length < 2) return null;
   const width = annotation.strokeWidth || 2, color = annotation.strokeColor || "#d04a3a", fill = annotation.fillColor || "#fff2a8", opacity = annotation.fillOpacity ?? 0;
+  if(annotation.markupKind==="flag"){const spec=common(annotation,"FreeText",boundsRect(points,pageHeight,0),color,width);spec.interiorColor=blendWithWhite(fill,opacity);spec.contents=annotation.showFlagText===false?"":annotation.text||"Flag";spec.subject=annotation.subject||"Flag";spec.defaultAppearance={font:appearanceFontName(annotation),size:annotation.fontSize||14,color:rgb(annotation.textColor||"#ffffff")};spec.justification=annotation.textAlign==="left"?0:annotation.textAlign==="right"?2:1;spec.textAlign=annotation.textAlign||"center";spec.verticalAlign=annotation.verticalAlign||"middle";spec.textUnderline=Boolean(annotation.textUnderline);spec.flag=true;return spec;}
   if (annotation.markupKind === "line" || annotation.markupKind === "arrow") {
     const spec = common(annotation, "Line", boundsRect(points, pageHeight, width + 8), color, width);
     spec.line = flatPoints([points[0], points.at(-1)], pageHeight);spec.lineEndings = annotation.markupKind === "arrow" ? [lineEnding(annotation.startArrow), lineEnding(annotation.endArrow)] : ["None", "None"];return spec;
@@ -145,7 +155,7 @@ function highlightSpec(annotation, pageHeight) {
 }
 
 function freeTextSpec(annotation, pageHeight) {
-  const color=annotation.color||"#15191f",background=annotation.backgroundColor&&annotation.backgroundColor!=="transparent"?annotation.backgroundColor:null,border=(annotation.borderWidth||0)>0?(annotation.borderColor||"#15191f"):null,spec=common(annotation,"FreeText",boxRect(annotation,pageHeight),border,annotation.borderWidth||0,1);if(background)spec.interiorColor=rgb(background);spec.contents=annotation.text||"";spec.subject="Text Box";spec.defaultAppearance={font:"Helv",size:annotation.fontSize||16,color:rgb(color)};spec.justification=annotation.textAlign==="center"?1:annotation.textAlign==="right"?2:0;return spec;
+  const color=annotation.color||"#15191f",background=annotation.backgroundColor&&annotation.backgroundColor!=="transparent"?annotation.backgroundColor:null,border=(annotation.borderWidth||0)>0?(annotation.borderColor||"#15191f"):null,spec=common(annotation,"FreeText",boxRect(annotation,pageHeight),border,annotation.borderWidth||0,1);if(background)spec.interiorColor=rgb(background);spec.contents=annotation.text||"";spec.subject="Text Box";spec.defaultAppearance={font:appearanceFontName(annotation),size:annotation.fontSize||16,color:rgb(color)};spec.justification=annotation.textAlign==="center"?1:annotation.textAlign==="right"?2:0;spec.textAlign=annotation.textAlign||"left";spec.verticalAlign=annotation.verticalAlign||"top";spec.textUnderline=Boolean(annotation.textUnderline);return spec;
 }
 
 export function pdfAnnotationSpec(annotation, pageHeight, measurementLabel = "") {

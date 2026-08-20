@@ -1,4 +1,15 @@
-export const MARKUP_LABELS={line:"Line",arrow:"Arrow",rectangle:"Rectangle",ellipse:"Ellipse",cloud:"Cloud",polygon:"Polygon",freehand:"Freehand"};
+export const MARKUP_LABELS={line:"Line",arrow:"Arrow",rectangle:"Rectangle",ellipse:"Ellipse",cloud:"Cloud",polygon:"Polygon",freehand:"Freehand",flag:"Flag"};
+
+const MARKUP_FORMAT_KEYS=["strokeColor","strokeWidth","lineType","fillColor","fillOpacity","startArrow","endArrow","fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","showFlagText","textColor","textAlign","verticalAlign"];
+const MEASUREMENT_FORMAT_KEYS=["lineColor","lineWidth","lineType","labelColor","shadeColor","shadeOpacity","hatchPattern","areaFillEnabled","showPerimeterLength"];
+
+export function formatPainterPatch(source,target){
+  if(!source||!target||source.type!==target.type||!["markup","measurement"].includes(source.type))return null;
+  if(source.type==="measurement"&&(source.measureKind==="calibration"||target.measureKind==="calibration"))return null;
+  const keys=source.type==="markup"?MARKUP_FORMAT_KEYS:MEASUREMENT_FORMAT_KEYS,patch={};
+  for(const key of keys)if(Object.hasOwn(source,key))patch[key]=structuredClone(source[key]);
+  return patch;
+}
 
 export function markupBounds(points=[]){
   if(!points.length)return{x:0,y:0,w:0,h:0};
@@ -7,7 +18,18 @@ export function markupBounds(points=[]){
 }
 
 export function makeMarkup(kind,points,page,pageId,id){
-  return{id,type:"markup",markupKind:kind,subject:MARKUP_LABELS[kind]||"Markup",comment:"",status:"None",page,pageId,points,strokeColor:"#d04a3a",strokeWidth:2,lineType:"solid",fillColor:"#fff2a8",fillOpacity:["rectangle","ellipse","cloud","polygon"].includes(kind)?.18:0,startArrow:"none",endArrow:kind==="arrow"?"filled":"none",...markupBounds(points)};
+  const flag=kind==="flag";
+  return{id,type:"markup",markupKind:kind,subject:MARKUP_LABELS[kind]||"Markup",comment:"",status:"None",page,pageId,points,strokeColor:flag?"#a96f76":"#d04a3a",strokeWidth:flag?1:2,lineType:"solid",fillColor:flag?"#b87d83":"#fff2a8",fillOpacity:flag?1:["rectangle","ellipse","cloud","polygon"].includes(kind)?.18:0,startArrow:"none",endArrow:kind==="arrow"?"filled":"none",...(flag?{text:"Flag",showFlagText:false,textColor:"#ffffff",fontFamily:"Arial, Helvetica, sans-serif",fontChoice:"Arial, Helvetica, sans-serif",fontSize:14,fontWeight:"600",fontStyle:"normal",textUnderline:false,textAlign:"center",verticalAlign:"middle"}:{}),...markupBounds(points)};
+}
+
+export function flagPolygonPoints(bounds){
+  const notch=Math.min(bounds.w*.28,bounds.h*.55);
+  return[{x:bounds.x+notch,y:bounds.y},{x:bounds.x+bounds.w,y:bounds.y},{x:bounds.x+bounds.w,y:bounds.y+bounds.h},{x:bounds.x+notch,y:bounds.y+bounds.h},{x:bounds.x,y:bounds.y+bounds.h/2}];
+}
+
+export function defaultFlagPoints(anchor,pageSize,size={width:160,height:34}){
+  const width=Math.min(size.width,pageSize.width),height=Math.min(size.height,pageSize.height),x=Math.max(0,Math.min(pageSize.width-width,anchor.x-width/2)),y=Math.max(0,Math.min(pageSize.height-height,anchor.y-height/2));
+  return[{x,y},{x:x+width,y:y+height}];
 }
 
 export function cloudPath(bounds,coordinateSystem="screen"){
@@ -26,7 +48,7 @@ export function copyPageItem(source,{id,page,pageId,pageSize,offset=12}){if(!["m
 export function markupListRows(annotations=[],pages=[],valueForItem=item=>item.displayValue||""){
   const pageById=new Map(pages.map((page,index)=>[page.id,index+1]));
   return annotations.filter(item=>["markup","highlight","text","replacement","measurement"].includes(item.type)&&!item.deleted).map(item=>({
-    id:item.id,visible:item.visible!==false,page:pageById.get(item.pageId)||item.page||1,type:item.type==="markup"?(MARKUP_LABELS[item.markupKind]||"Markup"):item.type==="measurement"?`${item.measureKind} measure`:item.type,subject:item.subject||item.text?.slice(0,40)||MARKUP_LABELS[item.markupKind]||item.type,value:valueForItem(item),comment:item.comment||"",status:item.status||"None"
+    id:item.id,visible:item.visible!==false,page:pageById.get(item.pageId)||item.page||1,type:item.type==="markup"?(MARKUP_LABELS[item.markupKind]||"Markup"):item.type==="measurement"?`${item.measureKind} measure`:item.type,subject:item.subject||item.text?.slice(0,40)||MARKUP_LABELS[item.markupKind]||item.type,value:item.type==="markup"&&item.markupKind==="flag"?item.text||"":valueForItem(item),comment:item.comment||"",status:item.status||"None"
   })).sort((first,last)=>first.page-last.page);
 }
 
