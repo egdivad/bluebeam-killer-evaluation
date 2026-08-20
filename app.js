@@ -1,6 +1,7 @@
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
 import { addBlankPage, alignElementToPage, annotationsForPageId, buildEditableTextBlocks, calculateAnchoredScroll, calculateFitScale, calculatePanScroll, calibrateDrawingScale, constrainMoveDelta, constrainPointToAxis, createHighlightGeometry, extractVectorSegments, formatMeasurement, getExportPlan, makeSourcePages, measurementBounds, measurementFillBoundary, measurementHatchSegments, measurementLineDash, measurementPerimeterValue, measurementValue, pageNumberLabel, pointDistance, removeControlPoint, removePage, reorderPage, shortcutCommand, shouldInsertText, snapPointToSegments, syncAnnotationPages } from "./editor-core.js?v=58";
 import { MARKUP_LABELS, arrowheadGeometry, cloudPath, copyPageItem, groupMarkupRows, makeMarkup, markupBounds, markupListRows, rowsToCsv, sortMarkupRows } from "./markup-core.js?v=6";
+import { addPdfLibAnnotation } from "./pdf-annotations.js?v=3";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
@@ -549,8 +550,11 @@ document.addEventListener("keydown",e=>{
 });
 document.addEventListener("keyup",e=>{if(e.code==="Space"&&(panState.spaceHeld||panState.dragging)){e.preventDefault();setSpacePan(false);}});
 
-$("exportButton").onclick=async()=>{if(!state.bytes){toast("Open a PDF first.");return;}try{const fileName=$("fileName").textContent.replace(/\.pdf$/i,"-edited.pdf"),saveHandle=await chooseSaveLocation(fileName);if(saveHandle===null){toast("Export canceled.");return;}toast("Preparing secure text edits...");const output=await buildExportPdf();await savePdfLocally(output,fileName,saveHandle);toast("PDF saved. Original edited text removed.");}catch(err){console.error(err);toast("The PDF could not be exported.");}};
-async function buildExportPdf(){
+$("exportButton").onclick=()=>{if(!state.bytes){toast("Open a PDF first.");return;}$("exportDialog").showModal();};
+$("cancelExport").onclick=()=>$("exportDialog").close();
+$("exportDialog").onclick=event=>{if(event.target===$("exportDialog"))$("exportDialog").close();};
+$("exportChoices").onclick=async event=>{const button=event.target.closest("[data-export-mode]");if(!button)return;const mode=button.dataset.exportMode;$("exportDialog").close();try{const suffix=mode==="editable"?"-editable.pdf":"-edited.pdf",fileName=$("fileName").textContent.replace(/\.pdf$/i,suffix),saveHandle=await chooseSaveLocation(fileName);if(saveHandle===null){toast("Export canceled.");return;}toast(mode==="editable"?"Preparing editable PDF annotations...":"Preparing secure flattened export...");const output=await buildExportPdf(mode);await savePdfLocally(output,fileName,saveHandle);toast(mode==="editable"?"Editable PDF saved.":"Flattened PDF saved.");}catch(err){console.error(err);toast("The PDF could not be exported.");}};
+async function buildExportPdf(mode="flattened"){
   const source=await PDFLib.PDFDocument.load(state.bytes.slice()),doc=await PDFLib.PDFDocument.create();
   const vectorAnnotations=state.annotations.filter(isAnnotationVisible);
   for(const {page:descriptor,pageNumber,flattenSource} of getExportPlan(state.pages,vectorAnnotations)){
@@ -565,7 +569,7 @@ async function buildExportPdf(){
   }
   const fontKeys=[...new Set(vectorAnnotations.filter(a=>a.type!=="highlight"&&!a.deleted).map(standardFontKey))],fonts={};
   for(const key of fontKeys)fonts[key]=await doc.embedFont(PDFLib.StandardFonts[key]);
-  for(const a of vectorAnnotations)drawVectorAnnotation(doc.getPage(a.page-1),a,fonts);
+  for(const a of vectorAnnotations){const page=doc.getPage(a.page-1),label=a.type==="measurement"?measurementLabelLines(a).join(" / "):"";if(mode==="editable"&&addPdfLibAnnotation(PDFLib,page,a,label))continue;drawVectorAnnotation(page,a,fonts);}
   return doc.save();
 }
 async function renderSecurePage(pageNumber){

@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{document.documentElement.dataset.theme=localStorage.getItem("bluebeam-killer-theme")||((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light");}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=050bcccd3f6a" />
+    <link rel="stylesheet" href="styles.css?v=6e35dcb18f90" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -205,6 +205,14 @@
         </div>
       </div>
     </dialog>
+    <dialog class="export-dialog" id="exportDialog" aria-labelledby="exportDialogTitle">
+      <div class="export-dialog-heading"><div><span>Export PDF</span><h2 id="exportDialogTitle">Choose an export type</h2></div><button id="cancelExport" type="button" aria-label="Close export options"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+      <p>Editable annotations can be selected in Bluebeam and other PDF editors. Flattened graphics keep the current fixed appearance.</p>
+      <div class="export-choices" id="exportChoices">
+        <button type="button" data-export-mode="editable"><span class="export-choice-icon ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Editable PDF</strong><small>Keep markups, highlights, text boxes, and measurements as PDF annotations.</small></span><em>Recommended</em></button>
+        <button type="button" data-export-mode="flattened"><span class="export-choice-icon ui-icon icon-file" aria-hidden="true"></span><span><strong>Flattened PDF</strong><small>Place all changes in the page content. These items cannot be selected as markups.</small></span></button>
+      </div>
+    </dialog>
     <dialog class="scale-dialog" id="scaleDialog" aria-labelledby="scaleDialogTitle">
       <form id="scaleForm">
         <div class="scale-dialog-heading"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><div><strong id="scaleDialogTitle">Set drawing scale</strong><small>Enter the real distance between the two selected points.</small></div></div>
@@ -214,6 +222,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=050bcccd3f6a"></script>
+    <script type="module" src="app.js?v=6e35dcb18f90"></script>
   </body>
 </html>
