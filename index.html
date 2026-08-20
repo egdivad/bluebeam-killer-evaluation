@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A focused browser PDF editor for highlights, inserted text, and visual text changes." />
+    <meta property="og:title" content="Bluebeam Killer" />
+    <meta property="og:description" content="Highlight, insert, and replace visible PDF text in your browser." />
+    <meta property="og:image" content="og.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bluebeam Killer" />
+    <meta name="twitter:description" content="Edit PDFs in your browser." />
+    <meta name="twitter:image" content="og.png" />
+    <title>Bluebeam Killer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem("bluebeam-killer-theme")||((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light");}catch{document.documentElement.dataset.theme="light";}</script>
+    <link rel="stylesheet" href="styles.css?v=1338f7065f5f" />
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">BK</span><span class="brand-name">Bluebeam Killer <small class="wip-badge" title="Evaluation build">EVA</small></span></div>
+      <div class="document-title">
+        <button class="icon-button mobile-only" id="toggleSidebar" aria-label="Show pages"><span class="ui-icon icon-menu" aria-hidden="true"></span></button>
+        <div><strong id="fileName">Project Brief.pdf</strong><span id="saveState">All changes saved locally</span></div>
+      </div>
+      <div class="top-actions">
+        <input id="fileInput" type="file" accept="application/pdf" hidden />
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Use dark mode" aria-pressed="false"><span class="ui-icon icon-moon theme-moon" aria-hidden="true"></span><span class="ui-icon icon-sun theme-sun" aria-hidden="true"></span></button>
+        <button class="button secondary" id="openButton" aria-keyshortcuts="Control+O">Open PDF</button>
+        <button class="button primary" id="exportButton" aria-keyshortcuts="Control+S Control+Shift+S">Export PDF</button>
+      </div>
+    </header>
+
+    <div class="measure-menu" id="measureMenu" hidden>
+      <div class="measure-menu-heading"><strong>Measure</strong><span id="measureScaleStatus">Scale not set</span></div>
+      <button data-measure-tool="calibrate"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><span><strong>Set scale</strong><small>Calibrate from two points</small></span></button>
+      <button data-measure-tool="length" aria-keyshortcuts="Alt+Shift+L"><span class="ui-icon icon-ruler" aria-hidden="true"></span><span><strong>Length</strong><small>Two points</small></span><kbd class="measure-shortcut">Shift+Alt+L</kbd></button>
+      <button data-measure-tool="polyline" aria-keyshortcuts="Alt+Shift+Q"><span class="ui-icon icon-route" aria-hidden="true"></span><span><strong>Polyline</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+Q</kbd></button>
+      <button data-measure-tool="area" aria-keyshortcuts="Alt+Shift+A"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Area</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+A</kbd></button>
+      <button data-measure-tool="perimeter" aria-keyshortcuts="Alt+Shift+P"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Perimeter</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+P</kbd></button>
+      <button data-measure-tool="diameter" aria-keyshortcuts="Alt+Shift+D"><span class="ui-icon icon-circle" aria-hidden="true"></span><span><strong>Diameter</strong><small>Two points across circle</small></span><kbd class="measure-shortcut">Shift+Alt+D</kbd></button>
+      <button data-measure-tool="angle" aria-keyshortcuts="Alt+Shift+G"><span class="ui-icon icon-angle" aria-hidden="true"></span><span><strong>Angle</strong><small>Arm, vertex, arm</small></span><kbd class="measure-shortcut">Shift+Alt+G</kbd></button>
+      <button data-measure-tool="count" aria-keyshortcuts="Alt+Shift+C"><span class="ui-icon icon-hash" aria-hidden="true"></span><span><strong>Count</strong><small>Click each item</small></span><kbd class="measure-shortcut">Shift+Alt+C</kbd></button>
+    </div>
+
+    <div class="markup-menu" id="markupMenu" hidden>
+      <div class="markup-menu-heading"><strong>Markup</strong><span>Local review tools</span></div>
+      <button data-markup-tool="line"><span class="ui-icon icon-line" aria-hidden="true"></span><span><strong>Line</strong><small>Drag between two points</small></span></button>
+      <button data-markup-tool="arrow"><span class="ui-icon icon-arrow-right" aria-hidden="true"></span><span><strong>Arrow</strong><small>Drag to point at an item</small></span></button>
+      <button data-markup-tool="rectangle"><span class="ui-icon icon-square" aria-hidden="true"></span><span><strong>Rectangle</strong><small>Drag around an item</small></span></button>
+      <button data-markup-tool="ellipse"><span class="ui-icon icon-circle" aria-hidden="true"></span><span><strong>Ellipse</strong><small>Drag around an item</small></span></button>
+      <button data-markup-tool="cloud"><span class="ui-icon icon-cloud" aria-hidden="true"></span><span><strong>Cloud</strong><small>Drag a revision cloud</small></span></button>
+      <button data-markup-tool="polygon"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Polygon</strong><small>Click points. Double-click to finish.</small></span></button>
+      <button data-markup-tool="freehand"><span class="ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Freehand</strong><small>Draw with the pointer</small></span></button>
+    </div>
+
+    <main class="workspace">
+      <aside class="sidebar" id="sidebar">
+        <div class="panel-resizer panel-resizer-right" id="sidebarResizer" role="separator" aria-label="Resize pages panel" aria-orientation="vertical" tabindex="0"></div>
+        <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
+        <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
+        <div id="thumbnails" class="thumbnails"></div>
+      </aside>
+
+      <section class="editor">
+        <nav class="toolbar" aria-label="PDF editing tools">
+          <div class="edit-toolbar-row">
+            <div class="tool-group">
+            <button class="tool active" data-tool="select" title="Select text (V)"><span class="ui-icon icon-pointer" aria-hidden="true"></span>Select</button>
+            <button class="tool" data-tool="highlight" title="Highlight text (H)"><span class="ui-icon icon-highlighter" aria-hidden="true"></span>Highlight</button>
+            <button class="tool" data-tool="insert" title="Insert text (T)"><span class="ui-icon icon-type" aria-hidden="true"></span>Insert text</button>
+            <button class="tool" data-tool="edit" title="Edit existing text (E)"><span class="ui-icon icon-text-cursor" aria-hidden="true"></span>Edit text</button>
+            <button class="tool" data-tool="markup" id="markupButton" title="Drawing markups"><span class="ui-icon icon-shapes" aria-hidden="true"></span>Markup</button>
+            <button class="tool" data-tool="measure" id="measureButton" title="Measure drawing"><span class="ui-icon icon-ruler" aria-hidden="true"></span>Measure</button>
+            <button class="snap-toggle toolbar-snap" id="snapToContentButton" type="button" aria-pressed="false" aria-label="Snap measurements to PDF vector content" title="Snap measurements to PDF vector content" disabled><span class="ui-icon icon-magnet" aria-hidden="true"></span><span class="snap-label">Snap</span></button>
+            </div>
+            <div class="highlight-palette" id="highlightPalette" aria-label="Highlight color" hidden><span>Color</span><button style="--highlight:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--highlight:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--highlight:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--highlight:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--highlight:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--highlight:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button><input id="highlightToolCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom highlight color" /></div>
+            <div class="divider"></div>
+            <div class="tool-group compact">
+            <button class="icon-button" id="undoButton" title="Undo (Ctrl+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z" disabled><span class="ui-icon icon-undo" aria-hidden="true"></span></button>
+            <button class="icon-button" id="redoButton" title="Redo (Ctrl+Y)" aria-label="Redo" aria-keyshortcuts="Control+Y" disabled><span class="ui-icon icon-redo" aria-hidden="true"></span></button>
+            <button class="icon-button" id="copyItemButton" title="Copy selected markup or measurement (Ctrl+C)" aria-label="Copy selected markup or measurement" aria-keyshortcuts="Control+C" disabled><span class="ui-icon icon-copy" aria-hidden="true"></span></button>
+            <button class="icon-button" id="pasteItemButton" title="Paste markup or measurement (Ctrl+V)" aria-label="Paste markup or measurement" aria-keyshortcuts="Control+V" disabled><span class="ui-icon icon-paste" aria-hidden="true"></span></button>
+            <button class="icon-button" id="deleteButton" title="Delete selected item (Delete)" aria-label="Delete selected item" aria-keyshortcuts="Delete" disabled><span class="ui-icon icon-trash" aria-hidden="true"></span></button>
+            <button class="icon-button" id="markupsListButton" title="Show Markups List" aria-label="Show Markups List" aria-pressed="false"><span class="ui-icon icon-list" aria-hidden="true"></span></button>
+            <button class="icon-button keyboard-button" id="keyboardShortcutsButton" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><span class="ui-icon icon-keyboard" aria-hidden="true"></span></button>
+            </div>
+            <div class="toolbar-spacer"></div>
+            <div class="zoom-controls">
+              <button id="zoomOut" aria-label="Zoom out"><span class="ui-icon icon-minus" aria-hidden="true"></span></button><span id="zoomValue">100%</span><button id="zoomIn" aria-label="Zoom in"><span class="ui-icon icon-plus" aria-hidden="true"></span></button>
+            </div>
+          </div>
+        </nav>
+
+        <div class="canvas-area" id="canvasArea">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-badge">PDF</div>
+            <h1>Edit PDFs without leaving your browser.</h1>
+            <p>Open a document to highlight key text, add notes, and replace visible wording.</p>
+            <button class="button primary large" id="emptyOpenButton">Choose a PDF</button>
+            <span>Your file stays in this browser.</span>
+          </div>
+          <div class="page-stage" id="pageStage" hidden>
+            <div class="page-shell" id="pageShell">
+              <canvas id="pdfCanvas"></canvas>
+              <div id="textLayer" class="text-layer"></div>
+              <div id="annotationLayer" class="annotation-layer"></div>
+              <div id="drawLayer" class="draw-layer"></div>
+            </div>
+          </div>
+        </div>
+
+        <section class="markups-panel" id="markupsPanel" aria-label="Markups List" hidden>
+          <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize Markups List" aria-orientation="horizontal" tabindex="0"></div>
+          <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
+        </section>
+
+        <footer class="statusbar">
+          <div class="page-navigation"><button id="prevPage" aria-label="Previous page"><span class="ui-icon icon-chevron-left" aria-hidden="true"></span></button><span>Page <input id="pageInput" value="1" inputmode="numeric" aria-label="Current page" /> of <b id="totalPages">1</b></span><span class="original-page-number" id="originalPageNumber" hidden></span><button id="nextPage" aria-label="Next page"><span class="ui-icon icon-chevron-right" aria-hidden="true"></span></button></div>
+          <div class="page-layout-control" id="pageLayoutControls" aria-label="Page view controls">
+            <button class="page-layout-action" data-view-command="fit-page" title="Fit Page (Ctrl+9)" aria-label="Fit Page" aria-keyshortcuts="Control+9"><span class="layout-icon icon-fit-page" aria-hidden="true"></span><span class="layout-label">Fit Page</span></button>
+            <button class="page-layout-action" data-view-command="fit-width" title="Fit Width (Ctrl+0)" aria-label="Fit Width" aria-keyshortcuts="Control+0"><span class="layout-icon icon-fit-width" aria-hidden="true"></span><span class="layout-label">Fit Width</span></button>
+            <button class="page-layout-action" data-view-command="actual-size" title="Actual Size (Ctrl+8)" aria-label="Actual Size" aria-keyshortcuts="Control+8"><span class="layout-icon icon-actual-size" aria-hidden="true"></span><span class="layout-label">Actual Size</span></button>
+            <span class="view-divider" aria-hidden="true"></span>
+            <button class="page-layout-action selected" aria-pressed="true" data-layout-mode="single" data-view-command="layout-single" title="Single Page (Ctrl+4)" aria-label="Single Page" aria-keyshortcuts="Control+4"><span class="layout-icon icon-layout-single" aria-hidden="true"></span><span class="layout-label">Single Page</span></button>
+            <button class="page-layout-action" aria-pressed="false" data-layout-mode="continuous" data-view-command="layout-continuous" title="Continuous Pages (Ctrl+5)" aria-label="Continuous Pages" aria-keyshortcuts="Control+5"><span class="layout-icon icon-layout-continuous" aria-hidden="true"></span><span class="layout-label">Continuous</span></button>
+            <button class="page-layout-action" aria-pressed="false" data-layout-mode="side" data-view-command="layout-side" title="Side-by-Side (Ctrl+6)" aria-label="Side-by-Side" aria-keyshortcuts="Control+6"><span class="layout-icon icon-layout-side" aria-hidden="true"></span><span class="layout-label">Side-by-Side</span></button>
+            <button class="page-layout-action" aria-pressed="false" data-layout-mode="continuous-side" data-view-command="layout-continuous-side" title="Continuous Side-by-Side (Ctrl+7)" aria-label="Continuous Side-by-Side" aria-keyshortcuts="Control+7"><span class="layout-icon icon-layout-continuous-side" aria-hidden="true"></span><span class="layout-label">Continuous Side</span></button>
+          </div>
+          <div class="local-status"><span class="privacy-dot"></span>Processed locally</div>
+        </footer>
+      </section>
+
+      <aside class="inspector" id="inspector">
+        <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize properties panel" aria-orientation="vertical" tabindex="0"></div>
+        <div class="inspector-empty" id="inspectorEmpty"><span class="ui-icon icon-file" aria-hidden="true"></span><strong>No item selected</strong><p>Select an annotation to change its style.</p></div>
+        <div class="inspector-content" id="inspectorContent" hidden>
+          <div class="inspector-title"><span>Properties</span><button id="closeInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <label class="toggle-row selected-visibility"><span><strong>Visible on page</strong><small>Hide this item without deleting it.</small></span><input id="selectedVisibility" type="checkbox" role="switch" checked /></label>
+          <div id="textProperties">
+          <label>Text<textarea id="textValue" rows="4" spellcheck="true"></textarea></label>
+          <label>Font<select id="fontFamily"><option value="original">Original font</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
+          <label>Font size<div class="field-row"><input id="fontSize" type="range" min="8" max="48" value="16" /><output id="fontSizeValue">16 pt</output></div></label>
+          <label>Horizontal alignment<div class="alignment-options" id="horizontalAlign" role="group" aria-label="Horizontal text alignment"><button data-align="left" class="selected"><span class="text-align-icon icon-text-left" aria-hidden="true"></span><span>Left</span></button><button data-align="center"><span class="text-align-icon icon-text-center" aria-hidden="true"></span><span>Center</span></button><button data-align="right"><span class="text-align-icon icon-text-right" aria-hidden="true"></span><span>Right</span></button></div></label>
+          <label>Vertical alignment<div class="alignment-options" id="verticalAlign" role="group" aria-label="Vertical text alignment"><button data-align="top" class="selected"><span class="text-align-icon icon-text-top" aria-hidden="true"></span><span>Top</span></button><button data-align="middle"><span class="text-align-icon icon-text-middle" aria-hidden="true"></span><span>Middle</span></button><button data-align="bottom"><span class="text-align-icon icon-text-bottom" aria-hidden="true"></span><span>Bottom</span></button></div></label>
+          <label>Position and size<div class="geometry-grid"><span>X<input id="posX" type="number" min="0" step="1" /></span><span>Y<input id="posY" type="number" min="0" step="1" /></span><span>Width<input id="boxWidth" type="number" min="30" step="1" /></span><span>Height<input id="boxHeight" type="number" min="12" step="1" /></span></div></label>
+          <label>Align selected item to page<div class="page-alignment-options" id="pageAlignment" role="group" aria-label="Align selected item to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
+          <label class="toggle-row"><span><strong>Auto-fit text box</strong><small>Match the box to the typed text.</small></span><input id="autoFitTextBox" type="checkbox" role="switch" /></label>
+          <label>Text color<div class="color-combo"><div class="swatches" id="swatches"><button style="--swatch:#15191f" data-color="#15191f" class="selected" aria-label="Charcoal"></button><button style="--swatch:#2563eb" data-color="#2563eb" aria-label="Blue"></button><button style="--swatch:#dc2626" data-color="#dc2626" aria-label="Red"></button><button style="--swatch:#16845b" data-color="#16845b" aria-label="Green"></button></div><input id="textColorCustom" type="color" value="#15191f" aria-label="Custom text color" title="Custom color" /></div></label>
+          <label>Background color<div class="color-combo"><div class="swatches" id="backgroundSwatches"><button class="transparent selected" data-bg="transparent" aria-label="No background"></button><button style="--swatch:#ffffff" data-bg="#ffffff" aria-label="White"></button><button style="--swatch:#fff2a8" data-bg="#fff2a8" aria-label="Yellow"></button><button style="--swatch:#dbeafe" data-bg="#dbeafe" aria-label="Blue"></button><button style="--swatch:#fce7f3" data-bg="#fce7f3" aria-label="Pink"></button></div><input id="backgroundColorCustom" type="color" value="#ffffff" aria-label="Custom background color" title="Custom color" /></div></label>
+          <label>Border width<div class="field-row"><input id="borderWidth" type="range" min="0" max="10" step="1" value="0" /><output id="borderWidthValue">0 pt</output></div></label>
+          <label>Border color<div class="color-combo"><div class="swatches" id="borderSwatches"><button style="--swatch:#15191f" data-border-color="#15191f" class="selected" aria-label="Charcoal border"></button><button style="--swatch:#2563eb" data-border-color="#2563eb" aria-label="Blue border"></button><button style="--swatch:#dc2626" data-border-color="#dc2626" aria-label="Red border"></button><button style="--swatch:#16845b" data-border-color="#16845b" aria-label="Green border"></button><button style="--swatch:#ffffff" data-border-color="#ffffff" aria-label="White border"></button></div><input id="borderColorCustom" type="color" value="#15191f" aria-label="Custom border color" title="Custom color" /></div></label>
+          <label id="highlightColorField" hidden>Highlight color<div class="color-combo"><div class="swatches highlight-swatches"><button style="--swatch:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--swatch:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--swatch:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--swatch:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--swatch:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--swatch:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button></div><input id="highlightColorCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom color" /></div></label>
+          <p class="edit-note" id="editNote">Export removes original text from edited pages. Edited and inserted text stays sharp and selectable.</p>
+          </div>
+          <div class="measurement-properties" id="measurementProperties" hidden>
+            <div class="measurement-kind" id="measurementKind">Length measurement</div>
+            <label>Line thickness<div class="field-row"><input id="measurementLineWidth" type="range" min="0.5" max="8" step="0.5" value="1.5" /><output id="measurementLineWidthValue">1.5 pt</output></div></label>
+            <label>Line color<div class="color-combo preset-picker" id="measurementLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="measurementLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="measurementLineColorValue">#D04A3A</output></div></div></label>
+            <label>Line type<select id="measurementLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
+            <label>Label color<div class="color-combo preset-picker" id="measurementLabelPresets"><div class="swatches"><button style="--swatch:#b33427" data-preset="#b33427" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="measurementLabelColor" type="color" value="#b33427" aria-label="Custom label color" /><output id="measurementLabelColorValue">#B33427</output></div></div></label>
+            <div id="measurementAreaFields">
+              <label class="toggle-row"><span><strong>Shape infill</strong><small>Show the shade and hatch inside the shape.</small></span><input id="measurementAreaFill" type="checkbox" role="switch" checked /></label>
+              <label class="toggle-row"><span><strong>Show perimeter length</strong><small>Add the perimeter below the area label.</small></span><input id="measurementShowPerimeter" type="checkbox" role="switch" /></label>
+              <label>Shape shade<div class="color-combo preset-picker" id="measurementShadePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#fff2a8" data-preset="#fff2a8" aria-label="Yellow"></button></div><div class="color-field"><input id="measurementShadeColor" type="color" value="#d04a3a" aria-label="Custom shade color" /><output id="measurementShadeColorValue">#D04A3A</output></div></div></label>
+              <label>Shade strength<div class="field-row"><input id="measurementShadeOpacity" type="range" min="0" max="100" step="5" value="15" /><output id="measurementShadeOpacityValue">15%</output></div></label>
+              <label>Hatch pattern<select id="measurementHatchPattern"><option value="none">None</option><option value="diagonal">Diagonal</option><option value="crosshatch">Crosshatch</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+            </div>
+            <p class="edit-note">These properties stay with the measurement in the page view, thumbnails, and exported PDF.</p>
+          </div>
+          <div class="markup-properties" id="markupProperties" hidden>
+            <div class="measurement-kind" id="markupKind">Drawing markup</div>
+            <label>Subject<input id="markupSubject" type="text" /></label>
+            <label>Status<select id="markupStatus"><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
+            <label>Comment<textarea id="markupComment" rows="4" spellcheck="true"></textarea></label>
+            <label>Line thickness<div class="field-row"><input id="markupLineWidth" type="range" min="0.5" max="10" step="0.5" value="2" /><output id="markupLineWidthValue">2 pt</output></div></label>
+            <label>Line color<div class="color-combo preset-picker" id="markupLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="markupLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="markupLineColorValue">#D04A3A</output></div></div></label>
+            <label>Line type<select id="markupLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
+            <div id="markupArrowFields"><label>Start arrow<select id="markupStartArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label><label>End arrow<select id="markupEndArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label></div>
+            <div id="markupFillFields"><label>Fill color<div class="color-combo preset-picker" id="markupFillPresets"><div class="swatches"><button style="--swatch:#fff2a8" data-preset="#fff2a8" aria-label="Yellow"></button><button style="--swatch:#dbeafe" data-preset="#dbeafe" aria-label="Blue"></button><button style="--swatch:#fce7f3" data-preset="#fce7f3" aria-label="Pink"></button><button style="--swatch:#dcfce7" data-preset="#dcfce7" aria-label="Green"></button></div><div class="color-field"><input id="markupFillColor" type="color" value="#fff2a8" aria-label="Custom fill color" /><output id="markupFillColorValue">#FFF2A8</output></div></div></label><label>Fill strength<div class="field-row"><input id="markupFillOpacity" type="range" min="0" max="100" step="5" value="18" /><output id="markupFillOpacityValue">18%</output></div></label></div>
+            <p class="edit-note">The drawing exports to PDF. Use the Markups List CSV to save review data.</p>
+          </div>
+        </div>
+      </aside>
+    </main>
+    <dialog class="shortcut-dialog" id="shortcutDialog" aria-labelledby="shortcutTitle">
+      <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+      <div class="shortcut-sections">
+        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>E</kbd></dd></div></dl></section>
+        <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
+        <section><h3>Edit and view</h3><dl><div><dt>Select page markups and measures</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy / paste selected item</dt><dd><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
+        <section><h3>Measurements and markups</h3><dl><div><dt>Undo last draft point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Lock direction</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Length</dt><dd><kbd>Shift+Alt+L</kbd></dd></div><div><dt>Polyline</dt><dd><kbd>Shift+Alt+Q</kbd></dd></div><div><dt>Area</dt><dd><kbd>Shift+Alt+A</kbd></dd></div><div><dt>Perimeter</dt><dd><kbd>Shift+Alt+P</kbd></dd></div><div><dt>Diameter</dt><dd><kbd>Shift+Alt+D</kbd></dd></div><div><dt>Angle</dt><dd><kbd>Shift+Alt+G</kbd></dd></div><div><dt>Count</dt><dd><kbd>Shift+Alt+C</kbd></dd></div></dl></section>
+        <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
+      </div>
+    </dialog>
+    <dialog class="scale-dialog" id="scaleDialog" aria-labelledby="scaleDialogTitle">
+      <form id="scaleForm">
+        <div class="scale-dialog-heading"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><div><strong id="scaleDialogTitle">Set drawing scale</strong><small>Enter the real distance between the two selected points.</small></div></div>
+        <label>Known distance<input id="scaleDistance" type="number" min="0.0001" step="any" value="1" required /></label>
+        <label>Unit<select id="scaleUnit"><option value="mm">Millimetres (mm)</option><option value="cm">Centimetres (cm)</option><option value="m">Metres (m)</option><option value="in">Inches (in)</option><option value="ft">Feet (ft)</option></select></label>
+        <div class="scale-dialog-actions"><button class="button secondary" id="cancelScale" type="button">Cancel</button><button class="button primary" type="submit">Set scale</button></div>
+      </form>
+    </dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="app.js?v=1338f7065f5f"></script>
+  </body>
+</html>
