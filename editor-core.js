@@ -410,8 +410,8 @@ export function shortcutCommand(event) {
   if (event.key === "F1") return "show-shortcuts";
   if (event.key === "+" || event.key === "=") return "zoom-in";
   if (event.key === "-") return "zoom-out";
-  if (shift) return ({ e: "edit", p: "markup-polygon" })[key] || null;
-  return ({ v: "select", h: "highlight", t: "insert", c: "markup-cloud", a: "markup-arrow", r: "markup-rectangle", e: "markup-ellipse", l: "markup-line" })[key] || null;
+  if (shift) return ({ e: "edit", f: "markup-flag", p: "markup-polygon" })[key] || null;
+  return ({ v: "select", h: "highlight", t: "insert", c: "markup-cloud", a: "markup-arrow", r: "markup-rectangle", e: "markup-ellipse", l: "markup-line", q: "markup-callout" })[key] || null;
 }
 
 export function calculateFitScale(pageSize, areaSize, layoutMode, fitMode) {

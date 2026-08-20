@@ -1,6 +1,6 @@
-export const MARKUP_LABELS={line:"Line",arrow:"Arrow",rectangle:"Rectangle",ellipse:"Ellipse",cloud:"Cloud",polygon:"Polygon",freehand:"Freehand",flag:"Flag"};
+export const MARKUP_LABELS={line:"Line",arrow:"Arrow",rectangle:"Rectangle",ellipse:"Ellipse",cloud:"Cloud",polygon:"Polygon",freehand:"Freehand",flag:"Flag",callout:"Callout"};
 
-const MARKUP_FORMAT_KEYS=["strokeColor","strokeWidth","lineType","fillColor","fillOpacity","startArrow","endArrow","fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","showFlagText","textColor","textAlign","verticalAlign"];
+const MARKUP_FORMAT_KEYS=["strokeColor","strokeWidth","lineType","fillColor","fillOpacity","startArrow","endArrow","fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","showFlagText","textColor","color","textAlign","verticalAlign","backgroundColor","borderWidth","borderColor","autoFit"];
 const MEASUREMENT_FORMAT_KEYS=["lineColor","lineWidth","lineType","labelColor","shadeColor","shadeOpacity","hatchPattern","areaFillEnabled","showPerimeterLength"];
 
 export function formatPainterPatch(source,target){
@@ -17,9 +17,29 @@ export function markupBounds(points=[]){
   return{x,y,w:Math.max(1,Math.max(...xs)-x),h:Math.max(1,Math.max(...ys)-y)};
 }
 
+export function calloutConnectionPoint(annotation){
+  const landing=annotation.points?.[1]||{x:annotation.x||0,y:annotation.y||0},left=annotation.x||0,top=annotation.y||0,right=left+(annotation.w||1),bottom=top+(annotation.h||1),clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+  const candidates=[{x:left,y:clamp(landing.y,top,bottom)},{x:right,y:clamp(landing.y,top,bottom)},{x:clamp(landing.x,left,right),y:top},{x:clamp(landing.x,left,right),y:bottom}];
+  return candidates.sort((a,b)=>Math.hypot(a.x-landing.x,a.y-landing.y)-Math.hypot(b.x-landing.x,b.y-landing.y))[0];
+}
+
+export function calloutBounds(annotation){
+  const connection=calloutConnectionPoint(annotation),box=[{x:annotation.x,y:annotation.y},{x:annotation.x+annotation.w,y:annotation.y+annotation.h}];
+  return markupBounds([...(annotation.points||[]),connection,...box]);
+}
+
+export function defaultCalloutGeometry(head,landing,pageSize,size={width:180,height:80}){
+  const gap=32,width=Math.min(size.width,pageSize.width),height=Math.min(size.height,pageSize.height),placeRight=landing.x>=head.x;
+  let x=placeRight?landing.x+gap:landing.x-gap-width,y=landing.y-height/2;
+  x=Math.max(0,Math.min(pageSize.width-width,x));y=Math.max(0,Math.min(pageSize.height-height,y));
+  return{points:[head,landing],x,y,w:width,h:height};
+}
+
+export function calloutBoxMove(annotation,dx,dy){return{x:annotation.x+dx,y:annotation.y+dy,landing:{x:annotation.points[1].x+dx,y:annotation.points[1].y+dy}};}
+
 export function makeMarkup(kind,points,page,pageId,id){
-  const flag=kind==="flag";
-  return{id,type:"markup",markupKind:kind,subject:MARKUP_LABELS[kind]||"Markup",comment:"",status:"None",page,pageId,points,strokeColor:flag?"#a96f76":"#d04a3a",strokeWidth:flag?1:2,lineType:"solid",fillColor:flag?"#b87d83":"#fff2a8",fillOpacity:flag?1:["rectangle","ellipse","cloud","polygon"].includes(kind)?.18:0,startArrow:"none",endArrow:kind==="arrow"?"filled":"none",...(flag?{text:"Flag",showFlagText:false,textColor:"#ffffff",fontFamily:"Arial, Helvetica, sans-serif",fontChoice:"Arial, Helvetica, sans-serif",fontSize:14,fontWeight:"600",fontStyle:"normal",textUnderline:false,textAlign:"center",verticalAlign:"middle"}:{}),...markupBounds(points)};
+  const flag=kind==="flag",callout=kind==="callout";
+  return{id,type:"markup",markupKind:kind,subject:MARKUP_LABELS[kind]||"Markup",comment:"",status:"None",page,pageId,points,strokeColor:flag?"#a96f76":"#d04a3a",strokeWidth:flag?1:2,lineType:"solid",fillColor:flag?"#b87d83":"#fff2a8",fillOpacity:flag?1:["rectangle","ellipse","cloud","polygon"].includes(kind)?.18:0,startArrow:callout?"filled":"none",endArrow:kind==="arrow"?"filled":"none",...(flag?{text:"",showFlagText:true,textColor:"#ffffff",fontFamily:"Arial, Helvetica, sans-serif",fontChoice:"Arial, Helvetica, sans-serif",fontSize:14,fontWeight:"600",fontStyle:"normal",textUnderline:false,textAlign:"center",verticalAlign:"middle"}:{}),...(callout?{text:"Callout",color:"#15191f",backgroundColor:"#ffffff",borderWidth:2,borderColor:"#d04a3a",autoFit:false,fontFamily:"Arial, Helvetica, sans-serif",fontChoice:"Arial, Helvetica, sans-serif",fontSize:16,fontWeight:"400",fontStyle:"normal",textUnderline:false,textAlign:"left",verticalAlign:"top"}:{}),...markupBounds(points)};
 }
 
 export function flagPolygonPoints(bounds){
@@ -43,12 +63,12 @@ export function cloudPath(bounds,coordinateSystem="screen"){
 
 export function arrowheadGeometry(tip,adjacent,size=12){const angle=Math.atan2(tip.y-adjacent.y,tip.x-adjacent.x),back={x:Math.cos(angle)*size,y:Math.sin(angle)*size},side={x:Math.cos(angle+Math.PI/2)*size*.48,y:Math.sin(angle+Math.PI/2)*size*.48};return{tip,left:{x:tip.x-back.x+side.x,y:tip.y-back.y+side.y},right:{x:tip.x-back.x-side.x,y:tip.y-back.y-side.y},center:{x:tip.x-back.x*.55,y:tip.y-back.y*.55}};}
 
-export function copyPageItem(source,{id,page,pageId,pageSize,offset=12}){if(!["markup","measurement"].includes(source?.type)||source.measureKind==="calibration"||!source.points?.length)return null;const bounds=markupBounds(source.points),roomRight=pageSize.width-bounds.x-bounds.w,roomBottom=pageSize.height-bounds.y-bounds.h,dx=roomRight>=offset?offset:bounds.x>=offset?-offset:Math.max(-bounds.x,roomRight),dy=roomBottom>=offset?offset:bounds.y>=offset?-offset:Math.max(-bounds.y,roomBottom),copy=JSON.parse(JSON.stringify(source));copy.id=id;copy.page=page;copy.pageId=pageId;copy.points=source.points.map(point=>({x:point.x+dx,y:point.y+dy}));return Object.assign(copy,markupBounds(copy.points));}
+export function copyPageItem(source,{id,page,pageId,pageSize,offset=12}){if(!["markup","measurement"].includes(source?.type)||source.measureKind==="calibration"||!source.points?.length)return null;const bounds=source.markupKind==="callout"?calloutBounds(source):markupBounds(source.points),roomRight=pageSize.width-bounds.x-bounds.w,roomBottom=pageSize.height-bounds.y-bounds.h,dx=roomRight>=offset?offset:bounds.x>=offset?-offset:Math.max(-bounds.x,roomRight),dy=roomBottom>=offset?offset:bounds.y>=offset?-offset:Math.max(-bounds.y,roomBottom),copy=JSON.parse(JSON.stringify(source));copy.id=id;copy.page=page;copy.pageId=pageId;copy.points=source.points.map(point=>({x:point.x+dx,y:point.y+dy}));if(source.markupKind==="callout"){copy.x+=dx;copy.y+=dy;return copy;}return Object.assign(copy,markupBounds(copy.points));}
 
 export function markupListRows(annotations=[],pages=[],valueForItem=item=>item.displayValue||""){
   const pageById=new Map(pages.map((page,index)=>[page.id,index+1]));
   return annotations.filter(item=>["markup","highlight","text","replacement","measurement"].includes(item.type)&&!item.deleted).map(item=>({
-    id:item.id,visible:item.visible!==false,page:pageById.get(item.pageId)||item.page||1,type:item.type==="markup"?(MARKUP_LABELS[item.markupKind]||"Markup"):item.type==="measurement"?`${item.measureKind} measure`:item.type,subject:item.subject||item.text?.slice(0,40)||MARKUP_LABELS[item.markupKind]||item.type,value:item.type==="markup"&&item.markupKind==="flag"?item.text||"":valueForItem(item),comment:item.comment||"",status:item.status||"None"
+    id:item.id,visible:item.visible!==false,page:pageById.get(item.pageId)||item.page||1,type:item.type==="markup"?(MARKUP_LABELS[item.markupKind]||"Markup"):item.type==="measurement"?`${item.measureKind} measure`:item.type,subject:item.subject||item.text?.slice(0,40)||MARKUP_LABELS[item.markupKind]||item.type,value:item.type==="markup"&&["flag","callout"].includes(item.markupKind)?item.text||"":valueForItem(item),comment:item.comment||"",status:item.status||"None"
   })).sort((first,last)=>first.page-last.page);
 }
 
