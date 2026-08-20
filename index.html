@@ -16,8 +16,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
-    <script>try{document.documentElement.dataset.theme=localStorage.getItem("bluebeam-killer-theme")||((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light");}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=1dc48680b52a" />
+    <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
+    <link rel="stylesheet" href="styles.css?v=0bc402029e6f" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -30,6 +30,7 @@
       <div class="top-actions">
         <input id="fileInput" type="file" accept="application/pdf" hidden />
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Use dark mode" aria-pressed="false"><span class="ui-icon icon-moon theme-moon" aria-hidden="true"></span><span class="ui-icon icon-sun theme-sun" aria-hidden="true"></span></button>
+        <button class="theme-toggle settings-toggle" id="settingsButton" type="button" aria-label="Open settings" title="Settings"><span class="ui-icon icon-settings" aria-hidden="true"></span></button>
         <button class="button secondary" id="openButton" aria-keyshortcuts="Control+O">Open PDF</button>
         <button class="button primary" id="exportButton" aria-keyshortcuts="Control+S Control+Shift+S">Export PDF</button>
       </div>
@@ -215,6 +216,10 @@
             <p class="edit-note">The drawing exports to PDF. Use the Markups List CSV to save review data.</p>
           </div>
         </div>
+        <div class="item-default-controls" id="itemDefaultControls" hidden>
+          <div><strong id="itemDefaultName">Item defaults</strong><small id="itemDefaultStatus">This item type uses the built-in default.</small></div>
+          <div class="item-default-actions"><button class="button secondary" id="resetItemDefault" type="button" title="Restore the built-in properties for this item type.">Reset default</button><button class="button primary" id="setItemDefault" type="button" title="Use these properties for new items of this type.">Set as default</button></div>
+        </div>
       </aside>
     </main>
     <dialog class="shortcut-dialog" id="shortcutDialog" aria-labelledby="shortcutTitle">
@@ -226,6 +231,17 @@
         <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
         <section><h3>Measurements</h3><dl><div><dt>Undo last draft point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected area or perimeter point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Length</dt><dd><kbd>Shift+Alt+L</kbd></dd></div><div><dt>Polyline</dt><dd><kbd>Shift+Alt+Q</kbd></dd></div><div><dt>Area</dt><dd><kbd>Shift+Alt+A</kbd></dd></div><div><dt>Perimeter</dt><dd><kbd>Shift+Alt+P</kbd></dd></div><div><dt>Diameter</dt><dd><kbd>Shift+Alt+D</kbd></dd></div><div><dt>Angle</dt><dd><kbd>Shift+Alt+G</kbd></dd></div><div><dt>Count</dt><dd><kbd>Shift+Alt+C</kbd></dd></div></dl></section>
         <section><h3>Edit and view</h3><dl><div><dt>Select page markups and measures</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy / paste selected item</dt><dd><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
+      </div>
+    </dialog>
+    <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+      <div class="settings-heading"><div><span>Preferences</span><h2 id="settingsTitle">Settings</h2></div><button id="closeSettings" type="button" aria-label="Close settings"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+      <div class="settings-body">
+        <section><h3>Appearance</h3><label>Theme<select id="settingsTheme"><option value="system">Use system setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label></section>
+        <section><h3>Editing defaults</h3><p id="savedDefaultsSummary">No custom item defaults are saved.</p><button class="button secondary" id="resetItemDefaults" type="button" title="Restore built-in properties for every markup and measurement type.">Reset all item defaults</button></section>
+        <section><h3>Interface</h3><label>Default page layout<select id="settingsPageLayout"><option value="single">Single page</option><option value="continuous">Continuous pages</option><option value="side">Side-by-side</option><option value="continuous-side">Continuous side-by-side</option></select></label><label class="settings-check"><input id="settingsSnapDefault" type="checkbox" /> Enable vector snap when the app opens</label><button class="button secondary" id="resetPanelLayout" type="button" title="Restore the original panel sizes and expanded states.">Reset panel layout</button></section>
+        <section><h3>Import and export</h3><p>Move preferences to another browser or computer with a JSON file.</p><div class="settings-actions"><button class="button secondary" id="importPreferences" type="button" title="Import and replace the preferences in this browser.">Import preferences</button><button class="button secondary" id="exportPreferences" type="button" title="Download all preferences as a JSON file.">Export preferences</button></div><input id="preferenceFileInput" type="file" accept="application/json,.json" hidden /></section>
+        <section class="settings-danger"><h3>Reset</h3><p>Restore all app preferences and item defaults.</p><button class="button secondary" id="resetAllPreferences" type="button" title="Restore every preference to its built-in value.">Reset all preferences</button></section>
+        <p class="settings-storage-note">Preferences are stored in this browser. They are not included in exported PDFs.</p>
       </div>
     </dialog>
     <dialog class="export-dialog" id="exportDialog" aria-labelledby="exportDialogTitle">
@@ -245,6 +261,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=1dc48680b52a"></script>
+    <script type="module" src="app.js?v=0bc402029e6f"></script>
   </body>
 </html>

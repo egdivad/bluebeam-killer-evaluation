@@ -1,7 +1,7 @@
 export const MARKUP_LABELS={line:"Line",arrow:"Arrow",rectangle:"Rectangle",ellipse:"Ellipse",cloud:"Cloud",polygon:"Polygon",freehand:"Freehand",flag:"Flag",callout:"Callout"};
 
-const MARKUP_FORMAT_KEYS=["strokeColor","strokeWidth","lineType","fillColor","fillOpacity","startArrow","endArrow","fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","showFlagText","textColor","color","textAlign","verticalAlign","backgroundColor","borderWidth","borderColor","autoFit"];
-const MEASUREMENT_FORMAT_KEYS=["lineColor","lineWidth","lineType","labelColor","shadeColor","shadeOpacity","hatchPattern","areaFillEnabled","showPerimeterLength"];
+export const MARKUP_FORMAT_KEYS=["strokeColor","strokeWidth","lineType","fillColor","fillOpacity","startArrow","endArrow","fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","showFlagText","textColor","color","textAlign","verticalAlign","backgroundColor","borderWidth","borderColor","autoFit"];
+export const MEASUREMENT_FORMAT_KEYS=["lineColor","lineWidth","lineType","labelColor","shadeColor","shadeOpacity","hatchPattern","areaFillEnabled","showPerimeterLength"];
 
 export function formatPainterPatch(source,target){
   if(!source||!target||source.type!==target.type||!["markup","measurement"].includes(source.type))return null;
