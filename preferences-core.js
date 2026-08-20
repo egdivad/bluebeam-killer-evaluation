@@ -4,10 +4,11 @@ export const PREFERENCES_KEY="bluebeam-killer-preferences";
 export const PREFERENCES_VERSION=1;
 export const MARKUP_DEFAULT_TYPES=["line","arrow","rectangle","ellipse","cloud","polygon","freehand","flag","callout"];
 export const MEASUREMENT_DEFAULT_TYPES=["length","polyline","area","perimeter","diameter","angle","count"];
+export const TEXT_FORMAT_KEYS=["fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit"];
 
 const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","borderWidth","lineWidth","shadeOpacity"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength"]);
 
-export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,markupDefaults:{},measurementDefaults:{},interface:{sidebarSize:null,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false}};}
+export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},markupDefaults:{},measurementDefaults:{},interface:{sidebarSize:null,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false}};}
 
 function safeNumber(value,min,max){const number=Number(value);return Number.isFinite(number)?Math.max(min,Math.min(max,number)):null;}
 function safeStyleValue(key,value){
@@ -29,14 +30,14 @@ function sanitizeDefaultMap(input,types,keys){const result={};if(!input||typeof 
 
 export function sanitizePreferences(input={}){
   const result=createPreferences();if(!input||typeof input!=="object"||Array.isArray(input))return result;
-  if(themes.has(input.theme))result.theme=input.theme;if(layouts.has(input.pageLayout))result.pageLayout=input.pageLayout;if(typeof input.snapToContent==="boolean")result.snapToContent=input.snapToContent;
-  result.markupDefaults=sanitizeDefaultMap(input.markupDefaults,MARKUP_DEFAULT_TYPES,MARKUP_FORMAT_KEYS);result.measurementDefaults=sanitizeDefaultMap(input.measurementDefaults,MEASUREMENT_DEFAULT_TYPES,MEASUREMENT_FORMAT_KEYS);
+  if(themes.has(input.theme))result.theme=input.theme;if(layouts.has(input.pageLayout))result.pageLayout=input.pageLayout;if(typeof input.snapToContent==="boolean")result.snapToContent=input.snapToContent;if(typeof input.cursorHints==="boolean")result.cursorHints=input.cursorHints;
+  result.textDefaults=sanitizeDefaultMap(input.textDefaults,["insert"],TEXT_FORMAT_KEYS);result.markupDefaults=sanitizeDefaultMap(input.markupDefaults,MARKUP_DEFAULT_TYPES,MARKUP_FORMAT_KEYS);result.measurementDefaults=sanitizeDefaultMap(input.measurementDefaults,MEASUREMENT_DEFAULT_TYPES,MEASUREMENT_FORMAT_KEYS);
   const view=input.interface;if(view&&typeof view==="object"&&!Array.isArray(view)){for(const[key,min,max]of[["sidebarSize",160,420],["inspectorSize",210,460],["markupsSize",120,520]]){const value=safeNumber(view[key],min,max);if(value!==null)result.interface[key]=value;}for(const key of ["inspectorCollapsed","markupsCollapsed"])if(typeof view[key]==="boolean")result.interface[key]=view[key];}
   return result;
 }
 
 export function parsePreferences(raw){const parsed=typeof raw==="string"?JSON.parse(raw):raw;if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)||!Number.isInteger(parsed.version)||parsed.version<1)throw new Error("The preference file is not valid.");if(parsed.version>PREFERENCES_VERSION)throw new Error("This preference file is from a newer app version.");return sanitizePreferences(parsed);}
-export function preferenceType(item){if(item?.type==="markup"&&MARKUP_DEFAULT_TYPES.includes(item.markupKind))return{group:"markupDefaults",kind:item.markupKind};if(item?.type==="measurement"&&MEASUREMENT_DEFAULT_TYPES.includes(item.measureKind))return{group:"measurementDefaults",kind:item.measureKind};return null;}
-export function captureItemDefault(item){const type=preferenceType(item);if(!type)return null;const keys=type.group==="markupDefaults"?MARKUP_FORMAT_KEYS:MEASUREMENT_FORMAT_KEYS;return sanitizeStyle(item,keys);}
+export function preferenceType(item){if(item?.type==="text")return{group:"textDefaults",kind:"insert"};if(item?.type==="markup"&&MARKUP_DEFAULT_TYPES.includes(item.markupKind))return{group:"markupDefaults",kind:item.markupKind};if(item?.type==="measurement"&&MEASUREMENT_DEFAULT_TYPES.includes(item.measureKind))return{group:"measurementDefaults",kind:item.measureKind};return null;}
+export function captureItemDefault(item){const type=preferenceType(item);if(!type)return null;const keys=type.group==="textDefaults"?TEXT_FORMAT_KEYS:type.group==="markupDefaults"?MARKUP_FORMAT_KEYS:MEASUREMENT_FORMAT_KEYS;return sanitizeStyle(item,keys);}
 export function applyItemDefault(item,preferences){const type=preferenceType(item);if(!type)return item;return Object.assign(item,structuredClone(preferences?.[type.group]?.[type.kind]||{}));}
-export function savedDefaultCount(preferences){return Object.keys(preferences?.markupDefaults||{}).length+Object.keys(preferences?.measurementDefaults||{}).length;}
+export function savedDefaultCount(preferences){return Object.keys(preferences?.textDefaults||{}).length+Object.keys(preferences?.markupDefaults||{}).length+Object.keys(preferences?.measurementDefaults||{}).length;}

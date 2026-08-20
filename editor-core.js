@@ -396,7 +396,7 @@ export function shortcutCommand(event) {
   }
   if (ctrl && shift && !alt) {
     if (key === "z") return "redo";
-    return ({ d: "delete-page", n: "insert-page", s: "export" })[key] || null;
+    return ({ c: "format-painter", d: "delete-page", n: "insert-page", s: "export" })[key] || null;
   }
   if (ctrl && !shift && !alt) {
     if (key === "arrowleft") return "previous-page";
