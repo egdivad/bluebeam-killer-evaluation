@@ -1,4 +1,4 @@
-import { MARKUP_FORMAT_KEYS, MEASUREMENT_FORMAT_KEYS } from "./markup-core.js?v=17";
+import { MARKUP_FORMAT_KEYS, MEASUREMENT_FORMAT_KEYS } from "./markup-core.js?v=20";
 
 export const PREFERENCES_KEY="bluebeam-killer-preferences";
 export const PREFERENCES_VERSION=1;
@@ -7,7 +7,7 @@ export const MEASUREMENT_DEFAULT_TYPES=["length","polyline","area","perimeter","
 export const TEXT_FORMAT_KEYS=["fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit"];
 export const HIGHLIGHT_FORMAT_KEYS=["highlightColor"];
 
-const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor","highlightColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","borderWidth","lineWidth","shadeOpacity"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength"]);
+const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor","highlightColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","borderWidth","lineWidth","shadeOpacity"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength","showAreaValue"]);
 
 export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},highlightDefaults:{},markupDefaults:{},measurementDefaults:{},interface:{sidebarSize:null,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false}};}
 

@@ -491,6 +491,14 @@ export function measurementPerimeterValue(kind, points = [], scale = { unitsPerP
   return measurementValue("perimeter", points, scale);
 }
 
+export function measurementAreaValue(kind, points = [], scale = { unitsPerPoint: 1, unit: "pt" }) {
+  if (kind === "diameter") {
+    const diameter = measurementValue("diameter", points, scale);
+    return Math.PI * (diameter / 2) ** 2;
+  }
+  return measurementValue("area", points, scale);
+}
+
 export function measurementFillBoundary(kind, points = [], segmentCount = 48) {
   if (kind !== "diameter") return points.map(point => ({ ...point }));
   if (points.length < 2) return [];
