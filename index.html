@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=7bf3656dd9af" />
+    <link rel="stylesheet" href="styles.css?v=3a3bce8da686" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -75,6 +75,16 @@
         </div>
         <section class="sidebar-panel active" id="pagesPanel" role="tabpanel" aria-labelledby="pagesTab">
           <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
+          <div class="page-selection-bar"><label><input id="selectAllPages" type="checkbox" /><span id="pageSelectionStatus">Current page</span></label></div>
+          <div class="page-tools" aria-label="Page tools">
+            <button id="rotatePagesLeft" type="button" title="Rotate selected pages left" disabled><span class="ui-icon icon-rotate-left" aria-hidden="true"></span><span>Left</span></button>
+            <button id="rotatePagesRight" type="button" title="Rotate selected pages right" disabled><span class="ui-icon icon-rotate-right" aria-hidden="true"></span><span>Right</span></button>
+            <button id="duplicatePages" type="button" title="Duplicate selected pages" disabled><span class="ui-icon icon-files" aria-hidden="true"></span><span>Copy</span></button>
+            <button id="cropPage" type="button" title="Draw a new crop area on one selected page" disabled><span class="ui-icon icon-crop" aria-hidden="true"></span><span>Crop</span></button>
+            <button id="replacePages" type="button" title="Replace selected pages with pages from another PDF" disabled><span class="ui-icon icon-replace" aria-hidden="true"></span><span>Replace</span></button>
+            <button id="extractPages" type="button" title="Export selected pages to a new editable PDF" disabled><span class="ui-icon icon-file-output" aria-hidden="true"></span><span>Extract</span></button>
+          </div>
+          <input id="replacePagesInput" type="file" accept="application/pdf,.pdf" hidden />
           <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
           <div id="thumbnails" class="thumbnails"></div>
         </section>
@@ -384,6 +394,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=7bf3656dd9af"></script>
+    <script type="module" src="app.js?v=3a3bce8da686"></script>
   </body>
 </html>

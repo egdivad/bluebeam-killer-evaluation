@@ -58,6 +58,7 @@ export function annotationsForPageId(annotations, pageId) {
 export function pageNumberLabel(descriptor, index) {
   const current = index + 1;
   if (descriptor?.blank) return `${current} · Inserted`;
+  if (descriptor?.imported) return `${current} · Replacement ${descriptor.sourceIndex}`;
   if (descriptor?.sourceIndex && descriptor.sourceIndex !== current) return `${current} · Original ${descriptor.sourceIndex}`;
   return String(current);
 }

@@ -42,8 +42,21 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .sidebar-heading span:last-child { text-transform:none; letter-spacing:0; font-weight:500; }
 .insert-page-button { width:100%; height:32px; margin:0 0 14px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px dashed #9da6af; border-radius:6px; background:#fff; color:var(--navy); font-size:10px; font-weight:700; cursor:pointer; }
 .insert-page-button:hover { border-color:var(--navy); background:#edf3f8; }
+.page-selection-bar { margin:-5px 0 8px; }
+.page-selection-bar label { min-width:0; display:flex; align-items:center; gap:6px; color:var(--muted); font-size:9px; cursor:pointer; }
+.page-selection-bar input { width:14px; height:14px; margin:0; accent-color:var(--navy); }
+.page-selection-bar span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.page-tools { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; margin-bottom:9px; }
+.page-tools button { min-width:0; height:31px; display:flex; align-items:center; justify-content:center; gap:3px; padding:0 4px; border:1px solid #cfd4da; border-radius:5px; background:#fff; color:#52606d; font-size:8px; font-weight:700; cursor:pointer; }
+.page-tools button:hover:not(:disabled),.page-tools button.active { color:var(--navy); border-color:#8fa9bf; background:#edf3f8; }
+.page-tools button:disabled { opacity:.35; cursor:default; }
+.page-tools .ui-icon { width:12px; height:12px; flex-basis:12px; }
+.page-shell.page-crop-active { cursor:crosshair; }
+.page-crop-draft { position:absolute; z-index:9; border:2px dashed #1c73b9; background:rgba(28,115,185,.13); pointer-events:none; }
 .thumbnails { display:grid; gap:16px; }
-.thumbnail-item { display:grid; grid-template-columns:minmax(0,1fr) 25px; gap:6px; align-items:start; padding:4px; border:1px solid transparent; border-radius:7px; }
+.thumbnail-item { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 25px; gap:6px; align-items:start; padding:4px; border:1px solid transparent; border-radius:7px; }
+.thumbnail-item.page-selected { border-color:#8fa9bf; background:#eaf2f8; }
+.thumbnail-select { position:absolute; z-index:2; top:7px; left:7px; width:15px; height:15px; margin:0; accent-color:var(--navy); cursor:pointer; }
 .thumbnail-item.dragging { opacity:.45; }
 .thumbnail-item.drag-over { border-color:var(--navy); background:#e7eff6; }
 .thumbnail-actions { display:grid; gap:4px; }
@@ -210,6 +223,12 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .icon-crosshair { --icon-url:url("icons/crosshair.svg"); }
 .icon-arrow-up { --icon-url:url("icons/arrow-up.svg"); }
 .icon-arrow-down { --icon-url:url("icons/arrow-down.svg"); }
+.icon-rotate-left { --icon-url:url("icons/rotate-ccw.svg"); }
+.icon-rotate-right { --icon-url:url("icons/rotate-cw.svg"); }
+.icon-files { --icon-url:url("icons/files.svg"); }
+.icon-crop { --icon-url:url("icons/crop.svg"); }
+.icon-replace { --icon-url:url("icons/refresh-cw.svg"); }
+.icon-file-output { --icon-url:url("icons/file-output.svg"); }
 .icon-fit-page { --icon-url:url("icons/maximize.svg"); }
 .icon-fit-width { --icon-url:url("icons/move-horizontal.svg"); }
 .icon-actual-size { position:relative; background:transparent; -webkit-mask:none; mask:none; }
@@ -608,6 +627,7 @@ html[data-theme="dark"] .bookmark-row { border-color:#3a4652; background:#20272f
 html[data-theme="dark"] .button,
 html[data-theme="dark"] .theme-toggle,
 html[data-theme="dark"] .insert-page-button,
+html[data-theme="dark"] .page-tools button,
 html[data-theme="dark"] .thumbnail-actions button,
 html[data-theme="dark"] .zoom-controls,
 html[data-theme="dark"] .zoom-controls button { border-color:#3a4652; background:#20272f; color:#dbe3ea; }
@@ -632,6 +652,7 @@ html[data-theme="dark"] .canvas-area { background-color:#252c34; background-imag
 html[data-theme="dark"] .cursor-tool-hint { border-color:#6088a4; background:rgba(219,235,247,.96); color:#152b3b; }
 html[data-theme="dark"] .empty-badge { border-color:#46515c; background:#1b2128; }
 html[data-theme="dark"] .thumbnail-item.drag-over { background:#20384b; }
+html[data-theme="dark"] .thumbnail-item.page-selected { border-color:#5d96bc; background:#20384b; }
 html[data-theme="dark"] .thumbnail-label,
 html[data-theme="dark"] .layout-page-number { color:#aeb8c2; }
 html[data-theme="dark"] .inspector-empty strong,
