@@ -9,7 +9,7 @@ export const HIGHLIGHT_FORMAT_KEYS=["highlightColor"];
 
 const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor","highlightColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","borderWidth","lineWidth","shadeOpacity"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength","showAreaValue"]);
 
-export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},highlightDefaults:{},markupDefaults:{},measurementDefaults:{},interface:{sidebarSize:null,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false}};}
+export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},highlightDefaults:{},markupDefaults:{},measurementDefaults:{},interface:{sidebarSize:240,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false}};}
 
 function safeNumber(value,min,max){const number=Number(value);return Number.isFinite(number)?Math.max(min,Math.min(max,number)):null;}
 function safeStyleValue(key,value){
