@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=9b8b3dbd5cfb" />
+    <link rel="stylesheet" href="styles.css?v=bb3e77c61890" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -165,6 +165,42 @@
       <aside class="inspector" id="inspector">
         <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize or collapse properties panel" aria-orientation="vertical" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
         <div class="inspector-empty" id="inspectorEmpty"><span class="ui-icon icon-file" aria-hidden="true"></span><strong>No item selected</strong><p>Select an annotation to change its style.</p></div>
+        <div class="inspector-content batch-properties" id="batchProperties" hidden>
+          <div class="inspector-title"><span>Properties</span><button id="closeBatchInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <div class="batch-selection-summary"><strong id="batchSelectionCount">Multiple items selected</strong><small>Changes apply to compatible unlocked items.</small></div>
+          <section class="batch-property-group">
+            <h3>Common properties</h3>
+            <label>Visible on page<select id="batchVisibility"><option value="__mixed__">Mixed</option><option value="true">Visible</option><option value="false">Hidden</option></select></label>
+            <label>Layer<select id="batchLayer"><option value="__mixed__">Mixed</option><option value="">No layer</option></select></label>
+            <label>Status<select id="batchStatus"><option value="__mixed__">Mixed</option><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
+            <label>Comment<div class="batch-apply-row"><input id="batchComment" type="text" placeholder="Mixed" spellcheck="true" /><button id="applyBatchComment" type="button">Apply</button></div></label>
+          </section>
+          <section class="batch-property-group" id="batchTextGroup" hidden>
+            <h3>Text</h3>
+            <label>Font<select id="batchFontFamily"><option value="__mixed__">Mixed</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
+            <label>Font size<div class="field-row"><input id="batchFontSize" type="range" min="8" max="48" step="1" /><output id="batchFontSizeValue">Mixed</output></div></label>
+            <fieldset class="batch-style-options"><legend>Text style</legend><label><input id="batchBold" type="checkbox" /> Bold</label><label><input id="batchItalic" type="checkbox" /> Italic</label><label><input id="batchUnderline" type="checkbox" /> Underline</label></fieldset>
+            <label>Horizontal alignment<select id="batchTextAlign"><option value="__mixed__">Mixed</option><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+            <label>Vertical alignment<select id="batchVerticalAlign"><option value="__mixed__">Mixed</option><option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option></select></label>
+            <label>Text color<div class="color-field batch-color-field"><input id="batchTextColor" type="color" value="#15191f" /><output id="batchTextColorValue">Mixed</output></div></label>
+          </section>
+          <section class="batch-property-group" id="batchLineGroup" hidden>
+            <h3>Line and border</h3>
+            <label>Line thickness<div class="field-row"><input id="batchLineWidth" type="range" min="0.5" max="10" step="0.5" /><output id="batchLineWidthValue">Mixed</output></div></label>
+            <label>Line color<div class="color-field batch-color-field"><input id="batchLineColor" type="color" value="#d04a3a" /><output id="batchLineColorValue">Mixed</output></div></label>
+            <label id="batchLineTypeField">Line type<select id="batchLineType"><option value="__mixed__">Mixed</option><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
+          </section>
+          <section class="batch-property-group" id="batchFillGroup" hidden>
+            <h3>Background and fill</h3>
+            <label>Fill color<div class="color-field batch-color-field"><input id="batchFillColor" type="color" value="#fff2a8" /><output id="batchFillColorValue">Mixed</output></div></label>
+            <label id="batchFillOpacityField">Fill strength<div class="field-row"><input id="batchFillOpacity" type="range" min="0" max="100" step="5" /><output id="batchFillOpacityValue">Mixed</output></div></label>
+            <label id="batchHatchPatternField">Hatch pattern<select id="batchHatchPattern"><option value="__mixed__">Mixed</option><option value="none">None</option><option value="diagonal">Diagonal</option><option value="crosshatch">Crosshatch</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+          </section>
+          <section class="batch-property-group" id="batchHighlightGroup" hidden>
+            <h3>Highlight</h3>
+            <label>Highlight color<div class="color-field batch-color-field"><input id="batchHighlightColor" type="color" value="#ffd84d" /><output id="batchHighlightColorValue">Mixed</output></div></label>
+          </section>
+        </div>
         <div class="inspector-content" id="inspectorContent" hidden>
           <div class="inspector-title"><span>Properties</span><button id="closeInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <label class="toggle-row selected-visibility"><span><strong>Visible on page</strong><small>Hide this item without deleting it.</small></span><input id="selectedVisibility" type="checkbox" role="switch" checked /></label>
@@ -253,7 +289,7 @@
         <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
         <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
         <section><h3>Measurements</h3><dl><div><dt>Undo last draft point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected area or perimeter point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Length</dt><dd><kbd>Shift+Alt+L</kbd></dd></div><div><dt>Polyline</dt><dd><kbd>Shift+Alt+Q</kbd></dd></div><div><dt>Area</dt><dd><kbd>Shift+Alt+A</kbd></dd></div><div><dt>Perimeter</dt><dd><kbd>Shift+Alt+P</kbd></dd></div><div><dt>Diameter</dt><dd><kbd>Shift+Alt+D</kbd></dd></div><div><dt>Angle</dt><dd><kbd>Shift+Alt+G</kbd></dd></div><div><dt>Count</dt><dd><kbd>Shift+Alt+C</kbd></dd></div></dl></section>
-        <section><h3>Edit and view</h3><dl><div><dt>Select page markups and measures</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy / paste selected item</dt><dd><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></dd></div><div><dt>Format Painter</dt><dd><kbd>Ctrl+Shift+C</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
+        <section><h3>Edit and view</h3><dl><div><dt>Select all added page objects</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Add or remove one item from selection</dt><dd><kbd>Ctrl</kbd> + click</dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy / paste selected item</dt><dd><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></dd></div><div><dt>Format Painter</dt><dd><kbd>Ctrl+Shift+C</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
       </div>
     </dialog>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
@@ -284,6 +320,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=9b8b3dbd5cfb"></script>
+    <script type="module" src="app.js?v=bb3e77c61890"></script>
   </body>
 </html>
