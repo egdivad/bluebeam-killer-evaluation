@@ -5,7 +5,7 @@ export const MEASUREMENT_FORMAT_KEYS=["lineColor","lineWidth","lineType","labelC
 
 export function formatPainterPatch(source,target){
   if(!source||!target||source.type!==target.type||!["markup","measurement","highlight"].includes(source.type))return null;
-  const patch={layerId:source.layerId||null,layerName:source.layerName||"",layerVisible:source.layerId?source.layerVisible!==false:true};
+  const patch={layerId:source.layerId||null,layerName:source.layerName||"",layerVisible:source.layerId?source.layerVisible!==false:true,layerLocked:source.layerId?source.layerLocked===true:false,layerPrintable:source.layerId?source.layerPrintable!==false:true};
   if(source.type==="highlight")return{highlightColor:source.highlightColor||"#ffd84d",...patch};
   if(source.type==="measurement"&&(source.measureKind==="calibration"||target.measureKind==="calibration"))return null;
   const keys=source.type==="markup"?MARKUP_FORMAT_KEYS:MEASUREMENT_FORMAT_KEYS;

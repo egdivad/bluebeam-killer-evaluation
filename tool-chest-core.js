@@ -1,6 +1,6 @@
 const TOOL_CHEST_VERSION = 1;
 const SUPPORTED_TYPES = new Set(["text", "highlight", "markup", "measurement"]);
-const OMIT_FIELDS = new Set(["id", "page", "pageId", "layerId", "layerName", "deleted", "visible", "status", "comment", "x", "y", "sourceX", "sourceY", "sourceW", "sourceH", "rects", "countValue", "measurementScale"]);
+const OMIT_FIELDS = new Set(["id", "page", "pageId", "layerId", "layerName", "layerVisible", "layerLocked", "layerPrintable", "deleted", "visible", "status", "comment", "x", "y", "sourceX", "sourceY", "sourceW", "sourceH", "rects", "countValue", "measurementScale"]);
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function cleanName(value, fallback = "Saved tool") { return String(value || fallback).trim().slice(0, 100) || fallback; }
@@ -48,32 +48,39 @@ function xmlValue(block, names) {
   }
   return "";
 }
-function btxKind(block) {
-  const value = `${xmlValue(block,["Type","Subtype","ToolType","Subject"])} ${block.slice(0,220)}`.toLowerCase();
-  for (const [match,kind] of [["callout","markup:callout"],["cloud","markup:cloud"],["polyline","measurement:polyline"],["perimeter","measurement:perimeter"],["diameter","measurement:diameter"],["measurearea","measurement:area"],["area measurement","measurement:area"],["highlight","highlight"],["free text","text"],["textbox","text"],["arrow","markup:arrow"],["ellipse","markup:ellipse"],["circle","markup:ellipse"],["rectangle","markup:rectangle"],["square","markup:rectangle"],["polygon","markup:polygon"],["line","markup:line"]]) if (value.includes(match)) return kind;
-  return null;
+function hexBytes(value) {
+  const hex=String(value||"").trim();if(!hex||hex.length%2||!/^[0-9a-f]+$/i.test(hex))throw new Error("Invalid compressed BTX data.");
+  const bytes=new Uint8Array(hex.length/2);for(let index=0;index<bytes.length;index++)bytes[index]=Number.parseInt(hex.slice(index*2,index*2+2),16);return bytes;
 }
-function colorValue(value, fallback) {
-  const match = String(value || "").match(/#?[0-9a-f]{6}/i);return match ? `#${match[0].replace("#", "").toLowerCase()}` : fallback;
+async function inflateHex(value) {
+  if(typeof DecompressionStream!=="function")throw new Error("This browser cannot decompress Bluebeam BTX tools.");
+  const stream=new Blob([hexBytes(value)]).stream().pipeThrough(new DecompressionStream("deflate"));return new Response(stream).text();
 }
+function pdfArray(raw,key){const match=raw.match(new RegExp(`/${key}\\s*\\[([^\\]]*)\\]`,"i"));return match?match[1].trim().split(/\s+/).map(Number).filter(Number.isFinite):[];}
+function pdfNumber(raw,key,fallback=0){const match=raw.match(new RegExp(`/${key}\\s+(-?\\d+(?:\\.\\d+)?)`,"i"));return match?Number(match[1]):fallback;}
+function pdfName(raw,key){return raw.match(new RegExp(`/${key}\\s*/([^/<>\\[\\]()\\s]+)`,"i"))?.[1]||"";}
+function pdfString(raw,key){const value=raw.match(new RegExp(`/${key}\\s*\\(((?:\\\\.|[^\\)])*)\\)`,"i"))?.[1]||"";return value.replace(/\\([\\()])/g,"$1");}
+function componentHex(value){return Math.round(Math.max(0,Math.min(1,value))*255).toString(16).padStart(2,"0");}
+function pdfColor(raw,key,fallback){const values=pdfArray(raw,key);if(values.length===1)return`#${componentHex(values[0]).repeat(3)}`;if(values.length>=3)return`#${componentHex(values[0])}${componentHex(values[1])}${componentHex(values[2])}`;return fallback;}
+function styleColor(raw,fallback){return raw.match(/color\s*:\s*(#[0-9a-f]{6})/i)?.[1].toLowerCase()||fallback;}
+function btxLineType(raw){const value=raw.match(/\/BS\s*<<[\s\S]*?\/S\s*\/([A-Za-z]+)/i)?.[1]?.toLowerCase();return value==="d"?"dashed":value==="b"?"dotted":"solid";}
+function btxArrow(value){const name=String(value||"").replace(/^\//,"").toLowerCase();if(name.includes("closed")||name.includes("filled"))return"filled";if(name.includes("open"))return"open";if(name.includes("circle"))return"circle";if(name.includes("square"))return"square";if(name.includes("diamond"))return"diamond";return"none";}
+function btxArrowEnds(raw){const values=raw.match(/\/LE\s*\[([^\]]+)\]/i)?.[1]?.match(/\/[A-Za-z]+/g)||[];if(values.length)return[btxArrow(values[0]),btxArrow(values[1])];const single=pdfName(raw,"LE");return[single?btxArrow(single):"none","none"];}
+function btxKind(typeName,raw){const type=String(typeName||"").toLowerCase();if(type.includes("annotationpolygon"))return raw.includes("/PolygonCloud")?"markup:cloud":"markup:polygon";if(type.includes("annotationfreetext"))return raw.includes("/FreeTextCallout")?"markup:callout":"text";if(type.includes("annotationink"))return"markup:freehand";if(type.includes("annotationcircle"))return raw.includes("/CircleDimension")?"measurement:diameter":"markup:ellipse";if(type.includes("annotationsquare"))return"markup:rectangle";if(type.includes("annotationhighlight"))return"highlight";if(type.includes("annotationline")){if(raw.includes("/LineDimension"))return"measurement:length";const ends=btxArrowEnds(raw);return raw.includes("/LineArrow")||ends.some(value=>value!=="none")?"markup:arrow":"markup:line";}return null;}
+function btxProperties(kind,raw){const[type,subtype]=kind.split(":"),stroke=pdfColor(raw,"C",styleColor(raw,"#d04a3a")),fill=pdfColor(raw,"IC",stroke),width=pdfNumber(raw,"W",type==="measurement"?1.6:2),opacity=Math.max(0,Math.min(1,pdfNumber(raw,"FillOpacity",0))),subject=pdfString(raw,"Subj");
+  if(type==="markup"){const properties={type,markupKind:subtype,subject:subject||undefined,strokeColor:stroke,strokeWidth:width,lineType:btxLineType(raw),fillColor:fill,fillOpacity:opacity};if(subtype==="arrow"){const[startArrow,endArrow]=btxArrowEnds(raw);properties.startArrow=startArrow;properties.endArrow=endArrow;}if(subtype==="callout"){properties.text=pdfString(raw,"Contents")||"Callout";properties.color=styleColor(raw,stroke);properties.backgroundColor="#ffffff";properties.borderColor=stroke;properties.borderWidth=width;properties.fontFamily="Arial, Helvetica, sans-serif";properties.fontSize=pdfNumber(raw,"Tf",Number(raw.match(/font-size\s*:\s*(\d+(?:\.\d+)?)pt/i)?.[1])||12);properties.startArrow=btxArrow(pdfName(raw,"LE"))||"open";}return properties;}
+  if(type==="measurement")return{type,measureKind:subtype,lineColor:stroke,color:stroke,labelColor:styleColor(raw,stroke),lineWidth:width,lineType:btxLineType(raw)};
+  if(type==="highlight")return{type,highlightColor:stroke};
+  return{type,text:pdfString(raw,"Contents")||"Text",color:styleColor(raw,stroke),backgroundColor:"transparent",borderColor:stroke,borderWidth:width,fontChoice:"Arial, Helvetica, sans-serif",fontFamily:"Arial, Helvetica, sans-serif",fontSize:Number(raw.match(/font-size\s*:\s*(\d+(?:\.\d+)?)pt/i)?.[1])||12,textAlign:raw.match(/text-align\s*:\s*(left|center|right)/i)?.[1]?.toLowerCase()||"left",verticalAlign:"top"};
+}
+function btxToolLabel(kind){const value=kind.split(":").at(-1);return value[0].toUpperCase()+value.slice(1).replace("freehand","Freehand");}
 
-export function importBluebeamBtxText(text) {
-  const source = String(text || "");
-  if (!source.trim().startsWith("<")) throw new Error("This BTX file is binary or uses an unsupported Bluebeam format.");
-  const blocks = source.match(/<(?:Tool|Markup|Item)\b[\s\S]*?<\/(?:Tool|Markup|Item)>/gi) || [];
-  const tools = [], skipped = [];
-  for (const block of blocks) {
-    const kind = btxKind(block);if (!kind) { skipped.push(xmlValue(block,["Name","Subject"]) || "Unknown tool");continue; }
-    const type = kind.split(":")[0], subtype = kind.split(":")[1], name = xmlValue(block,["Name","Subject","Label"]) || subtype || type;
-    const properties = { type };
-    if (type === "markup") { properties.markupKind = subtype;properties.strokeColor = colorValue(xmlValue(block,["Color","StrokeColor","LineColor"]),"#d04a3a");properties.fillColor = colorValue(xmlValue(block,["FillColor","InteriorColor"]),"#fff2a8");properties.strokeWidth = Number(xmlValue(block,["Width","LineWidth"])) || 2;properties.fillOpacity = .15; }
-    if (type === "measurement") { properties.measureKind = subtype;properties.lineColor = colorValue(xmlValue(block,["Color","StrokeColor","LineColor"]),"#d04a3a");properties.lineWidth = Number(xmlValue(block,["Width","LineWidth"])) || 1.6; }
-    if (type === "highlight") properties.highlightColor = colorValue(xmlValue(block,["Color","FillColor"]),"#ffd84d");
-    if (type === "text") { properties.color = colorValue(xmlValue(block,["TextColor","Color"]),"#15191f");properties.backgroundColor = colorValue(xmlValue(block,["FillColor","InteriorColor"]),"#ffffff");properties.fontSize = Number(xmlValue(block,["FontSize","TextSize"])) || 16; }
-    tools.push(sanitizeTool({ id: crypto.randomUUID(), name, kind, properties, source: "bluebeam" }));
-  }
-  if (!blocks.length) throw new Error("No readable tool records were found in this BTX file.");
-  return { tools: tools.filter(Boolean), skipped: skipped.length, skippedNames: skipped };
+export async function importBluebeamBtxText(text) {
+  const source=String(text||"").replace(/^\uFEFF/,"");if(!source.trim().startsWith("<"))throw new Error("This BTX file is binary or uses an unsupported Bluebeam format.");
+  const blocks=source.match(/<ToolChestItem\b[\s\S]*?<\/ToolChestItem>/gi)||source.match(/<(?:Tool|Markup|Item)\b[\s\S]*?<\/(?:Tool|Markup|Item)>/gi)||[];if(!blocks.length)throw new Error("No readable tool records were found in this BTX file.");
+  let title="Bluebeam",titleHex=xmlValue(source,["Title"]);try{if(titleHex)title=(await inflateHex(titleHex)).trim()||title;}catch{}
+  const tools=[],skipped=[],nameCounts=new Map();for(const block of blocks){try{const rawHex=xmlValue(block,["Raw"]),raw=rawHex?await inflateHex(rawHex):block,typeName=xmlValue(block,["Type"]),kind=btxKind(typeName,raw);if(!kind)throw new Error("Unsupported annotation type");const properties=btxProperties(kind,raw),subject=properties.subject||pdfString(raw,"Subj")||title,label=btxToolLabel(kind),baseName=`${subject} ${label}`.trim(),count=(nameCounts.get(baseName)||0)+1;nameCounts.set(baseName,count);const name=count>1?`${baseName} ${count}`:baseName;tools.push(sanitizeTool({id:crypto.randomUUID(),name,kind,properties,source:"bluebeam"}));}catch{skipped.push(xmlValue(block,["Name"])||"Unknown tool");}}
+  return{title,tools:tools.filter(Boolean),skipped:skipped.length,skippedNames:skipped};
 }
 
 export function applyToolProperties(item, tool) {
