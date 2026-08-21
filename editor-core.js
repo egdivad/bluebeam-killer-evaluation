@@ -3,5 +3,6 @@
 export * from "./geometry-core.js";
 export * from "./measurement-core.js";
 export * from "./page-core.js";
+export * from "./page-rotation-core.js";
 export * from "./shortcut-core.js";
 export * from "./text-core.js";
