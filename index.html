@@ -13,19 +13,20 @@
     <meta name="twitter:description" content="Edit PDFs in your browser." />
     <meta name="twitter:image" content="og.png" />
     <title>Bluebeam Killer</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=ff652861c88d" />
+    <link rel="stylesheet" href="styles.css?v=4921ac265d8a" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
     <header class="topbar">
-      <div class="brand"><span class="brand-mark">BK</span><span class="brand-name"><span class="brand-title">Bluebeam Killer</span><small class="wip-badge" title="Evaluation build">Evaluation</small></span></div>
+      <div class="brand"><span class="brand-mark">BK</span><span class="brand-name"><span class="brand-title">Bluebeam Killer</span><span class="build-badges"><small class="wip-badge" title="Evaluation build">Evaluation</small></span></span></div>
       <div class="document-title">
         <button class="icon-button mobile-only" id="toggleSidebar" aria-label="Show document panels"><span class="ui-icon icon-menu" aria-hidden="true"></span></button>
-        <div><strong id="fileName">Project Brief.pdf</strong><span id="saveState">All changes saved locally</span></div>
+        <div><strong id="fileName">No PDF open</strong><span id="saveState">Open a PDF to begin</span></div>
       </div>
       <div class="top-actions">
         <input id="fileInput" type="file" accept="application/pdf" hidden />
@@ -66,6 +67,8 @@
         <div class="panel-resizer panel-resizer-right" id="sidebarResizer" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0"></div>
         <div class="sidebar-tabs" role="tablist" aria-label="Document panels">
           <button class="active" id="pagesTab" type="button" role="tab" aria-selected="true" aria-controls="pagesPanel" data-sidebar-tab="pages" title="Pages"><span class="ui-icon icon-file" aria-hidden="true"></span><span>Pages</span></button>
+          <button id="searchTab" type="button" role="tab" aria-selected="false" aria-controls="searchPanel" data-sidebar-tab="search" title="Search document" aria-keyshortcuts="Control+F"><span class="ui-icon icon-search" aria-hidden="true"></span><span>Search</span></button>
+          <button id="bookmarksTab" type="button" role="tab" aria-selected="false" aria-controls="bookmarksPanel" data-sidebar-tab="bookmarks" title="Bookmarks"><span class="ui-icon icon-bookmark" aria-hidden="true"></span><span>Bookmarks</span></button>
           <button id="layersTab" type="button" role="tab" aria-selected="false" aria-controls="layersPanel" data-sidebar-tab="layers" title="Layers"><span class="ui-icon icon-layers" aria-hidden="true"></span><span>Layers</span></button>
           <button id="toolChestTab" type="button" role="tab" aria-selected="false" aria-controls="toolChestPanel" data-sidebar-tab="tool-chest" title="Tool Chest"><span class="ui-icon icon-toolbox" aria-hidden="true"></span><span>Tool Chest</span></button>
         </div>
@@ -73,6 +76,25 @@
           <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
           <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
           <div id="thumbnails" class="thumbnails"></div>
+        </section>
+        <section class="sidebar-panel" id="searchPanel" role="tabpanel" aria-labelledby="searchTab" hidden>
+          <div class="sidebar-heading"><span>Search</span><span id="searchResultCount">0 results</span></div>
+          <form class="document-search-form" id="documentSearchForm" role="search">
+            <label for="documentSearchInput">Document text</label>
+            <div><input id="documentSearchInput" type="search" placeholder="Find text" autocomplete="off" disabled /><button id="documentSearchButton" type="submit" aria-label="Search document" disabled><span class="ui-icon icon-search" aria-hidden="true"></span></button></div>
+          </form>
+          <div class="document-search-options"><label><input id="searchMatchCase" type="checkbox" />Match case</label><label><input id="searchWholeWord" type="checkbox" />Whole words</label></div>
+          <div class="document-search-navigation"><button id="previousSearchResult" type="button" disabled aria-label="Previous search result"><span class="ui-icon icon-chevron-left" aria-hidden="true"></span></button><span id="searchResultPosition">No result selected</span><button id="nextSearchResult" type="button" disabled aria-label="Next search result"><span class="ui-icon icon-chevron-right" aria-hidden="true"></span></button></div>
+          <p class="document-search-status" id="documentSearchStatus" role="status">Open a PDF to search its text.</p>
+          <ol class="document-search-results" id="documentSearchResults"></ol>
+          <p class="sidebar-empty" id="documentSearchEmpty" hidden>No matching text was found.</p>
+        </section>
+        <section class="sidebar-panel" id="bookmarksPanel" role="tabpanel" aria-labelledby="bookmarksTab" hidden>
+          <div class="sidebar-heading"><span>Bookmarks</span><span id="bookmarkCount">0 bookmarks</span></div>
+          <button class="insert-page-button" id="addBookmarkButton" type="button" disabled><span class="ui-icon icon-plus" aria-hidden="true"></span>Add current page</button>
+          <div class="bookmark-list" id="bookmarkList" role="tree" aria-label="Document bookmarks"></div>
+          <p class="sidebar-empty" id="bookmarksEmpty">Open a PDF, then add a bookmark for the current page.</p>
+          <p class="sidebar-note">Bookmarks use standard PDF destinations. Unsupported external actions are not imported.</p>
         </section>
         <section class="sidebar-panel" id="layersPanel" role="tabpanel" aria-labelledby="layersTab" hidden>
           <div class="sidebar-heading"><span>Layers</span><span id="layerCount">0 layers</span></div>
@@ -307,7 +329,7 @@
       <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <div class="shortcut-sections">
         <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div></dl></section>
-        <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
+        <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Search document</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
         <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
         <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
         <section><h3>Measurements</h3><dl><div><dt>Undo last draft point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected area or perimeter point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Length</dt><dd><kbd>Shift+Alt+L</kbd></dd></div><div><dt>Polyline</dt><dd><kbd>Shift+Alt+Q</kbd></dd></div><div><dt>Area</dt><dd><kbd>Shift+Alt+A</kbd></dd></div><div><dt>Perimeter</dt><dd><kbd>Shift+Alt+P</kbd></dd></div><div><dt>Diameter</dt><dd><kbd>Shift+Alt+D</kbd></dd></div><div><dt>Angle</dt><dd><kbd>Shift+Alt+G</kbd></dd></div><div><dt>Count</dt><dd><kbd>Shift+Alt+C</kbd></dd></div></dl></section>
@@ -342,6 +364,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=ff652861c88d"></script>
+    <script type="module" src="app.js?v=4921ac265d8a"></script>
   </body>
 </html>
