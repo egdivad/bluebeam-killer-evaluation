@@ -214,6 +214,12 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .annotation { position:absolute; z-index:1; pointer-events:auto; cursor:pointer; border:1px solid transparent; }
 .original-text-cover { position:absolute; z-index:0; pointer-events:none; background:#fff; outline:3px solid #fff; }
 .annotation.highlight { background:rgba(255,216,77,.42); mix-blend-mode:multiply; }
+.tool-select .annotation.area-highlight { cursor:move; }
+.area-highlight-resize-handle { position:absolute; z-index:7; width:10px; height:10px; padding:0; border:1px solid #fff; border-radius:2px; background:#2078b8; box-shadow:0 1px 3px rgba(20,30,40,.3); pointer-events:auto; }
+.area-highlight-resize-n, .area-highlight-resize-s { cursor:ns-resize; }
+.area-highlight-resize-e, .area-highlight-resize-w { cursor:ew-resize; }
+.area-highlight-resize-nw, .area-highlight-resize-se { cursor:nwse-resize; }
+.area-highlight-resize-ne, .area-highlight-resize-sw { cursor:nesw-resize; }
 .highlight-segment { position:absolute; pointer-events:none; }
 .annotation.text, .annotation.replacement { white-space:pre-wrap; line-height:1.25; overflow-wrap:anywhere; padding:1px 2px; min-width:20px; }
 .annotation.replacement { background:white; }
@@ -228,6 +234,9 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .page-shell[class*="tool-measure-"] { cursor:crosshair; }
 .page-shell[class*="tool-markup-"] { cursor:crosshair; }
 .page-shell.format-painter-active { cursor:copy; }
+.page-shell.format-painter-highlight .annotation.highlight,
+.page-shell.format-painter-markup .markup-item,
+.page-shell.format-painter-measurement .measurement-item { cursor:url("icons/paintbrush.svg") 3 20, crosshair; }
 .icon-button.format-painter-active { background:#dceef9; color:#12547e; box-shadow:inset 0 0 0 1px #8fc1df; }
 .page-shell[class*="tool-measure-"] .text-layer { user-select:none; -webkit-user-select:none; }
 .measurement-svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
