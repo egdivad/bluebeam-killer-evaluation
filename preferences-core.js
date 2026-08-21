@@ -1,8 +1,8 @@
-import { MARKUP_FORMAT_KEYS, MEASUREMENT_FORMAT_KEYS } from "./markup-core.js?v=20";
+import { MARKUP_FORMAT_KEYS, MEASUREMENT_FORMAT_KEYS } from "./markup-core.js?v=21";
 
 export const PREFERENCES_KEY="bluebeam-killer-preferences";
 export const PREFERENCES_VERSION=1;
-export const MARKUP_DEFAULT_TYPES=["line","arrow","rectangle","ellipse","cloud","polygon","freehand","flag","callout"];
+export const MARKUP_DEFAULT_TYPES=["line","arrow","rectangle","ellipse","cloud","polygon","freehand","flag","callout","legend"];
 export const MEASUREMENT_DEFAULT_TYPES=["length","polyline","area","perimeter","diameter","angle","count"];
 export const TEXT_FORMAT_KEYS=["fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit"];
 export const HIGHLIGHT_FORMAT_KEYS=["highlightColor"];

@@ -36,6 +36,7 @@ export function batchTextAdapter(item) {
   if (["text", "replacement"].includes(item.type)) return { color: "color" };
   if (item.type === "markup" && item.markupKind === "flag") return { color: "textColor" };
   if (item.type === "markup" && item.markupKind === "callout") return { color: "color" };
+  if (item.type === "markup" && item.markupKind === "legend") return { color: "textColor" };
   return null;
 }
 
@@ -58,7 +59,7 @@ export function batchLineAdapter(item) {
 }
 
 export function batchFillAdapter(item) {
-  if (item.type === "markup" && ["rectangle", "ellipse", "cloud", "polygon", "flag"].includes(item.markupKind)) {
+  if (item.type === "markup" && ["rectangle", "ellipse", "cloud", "polygon", "flag", "legend"].includes(item.markupKind)) {
     return { color: "fillColor", opacity: "fillOpacity", hatch: null, colorLabel: "Fill color", opacityLabel: "Fill strength" };
   }
   if (item.type === "measurement" && ["area", "diameter"].includes(item.measureKind)) {
@@ -76,6 +77,6 @@ export function batchAreaMeasurementAdapter(item) {
 export function batchGeometryAdapter(item) {
   if (["text", "replacement"].includes(item.type)
     || item.type === "highlight" && !item.rects?.length
-    || item.type === "markup" && item.markupKind === "callout") return { x: "x", y: "y", w: "w", h: "h" };
+    || item.type === "markup" && ["callout", "legend"].includes(item.markupKind)) return { x: "x", y: "y", w: "w", h: "h" };
   return null;
 }

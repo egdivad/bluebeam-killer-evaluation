@@ -28,7 +28,7 @@ export function captureTool(item, name, id = crypto.randomUUID()) {
 export function sanitizeTool(tool) {
   if (!tool || typeof tool !== "object" || typeof tool.properties !== "object") return null;
   const kind = String(tool.kind || "");
-  if (!/^(text|highlight|markup:(line|arrow|rectangle|ellipse|cloud|polygon|freehand|flag|callout)|measurement:(length|polyline|area|perimeter|diameter|angle|count))$/.test(kind)) return null;
+  if (!/^(text|highlight|markup:(line|arrow|rectangle|ellipse|cloud|polygon|freehand|flag|callout|legend)|measurement:(length|polyline|area|perimeter|diameter|angle|count))$/.test(kind)) return null;
   return { id: String(tool.id || crypto.randomUUID()), name: cleanName(tool.name, kind), kind, properties: clone(tool.properties), source: tool.source === "bluebeam" ? "bluebeam" : "bluebeam-killer" };
 }
 

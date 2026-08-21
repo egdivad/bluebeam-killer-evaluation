@@ -58,6 +58,19 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .thumbnail-label { display:block; text-align:center; font-size:11px; margin-top:7px; color:var(--muted); }
 .sidebar-empty { margin:20px 4px; color:var(--muted); font-size:11px; line-height:1.45; text-align:center; }
 .sidebar-note { margin:16px 2px 0; padding:9px; border-radius:6px; background:#eef3f7; color:var(--muted); font-size:9px; line-height:1.4; }
+.takeoff-controls { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:9px; }
+.takeoff-controls label { min-width:0; display:grid; gap:4px; color:var(--muted); font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+.takeoff-controls select { min-width:0; height:31px; padding:0 7px; border:1px solid #cfd4da; border-radius:6px; background:#fff; color:var(--ink); font-size:10px; text-transform:none; letter-spacing:0; }
+.takeoff-actions { display:grid; grid-template-columns:44px 44px minmax(0,1fr); gap:5px; margin-bottom:10px; }
+.takeoff-actions button { min-width:0; height:30px; display:flex; align-items:center; justify-content:center; gap:4px; padding:0 6px; border:1px solid #cfd4da; border-radius:6px; background:#fff; color:var(--navy); font-size:9px; font-weight:700; cursor:pointer; }
+.takeoff-actions button:disabled { opacity:.38; cursor:default; }
+.takeoff-actions .ui-icon { width:12px; height:12px; }
+.takeoff-table-wrap { max-width:100%; overflow:auto; border:1px solid var(--line); border-radius:7px; background:#fff; }
+.takeoff-table { width:100%; border-collapse:collapse; font-size:9px; white-space:nowrap; }
+.takeoff-table th,.takeoff-table td { padding:6px 7px; border-bottom:1px solid #edf0f2; text-align:right; }
+.takeoff-table th { position:sticky; top:0; background:#f4f6f8; color:#596573; font-size:8px; letter-spacing:.3px; text-transform:uppercase; }
+.takeoff-table th:first-child,.takeoff-table td:first-child { max-width:110px; overflow:hidden; text-align:left; text-overflow:ellipsis; }
+.takeoff-table tr:last-child td { border-bottom:0; }
 .document-search-form { display:grid; gap:5px; }
 .document-search-form > label { color:var(--muted); font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
 .document-search-form > div { display:grid; grid-template-columns:minmax(0,1fr) 32px; }
@@ -579,6 +592,12 @@ html[data-theme="dark"] .tool-chest-actions button { border-color:#3a4652; backg
 html[data-theme="dark"] .tool-chest-item:hover { border-color:#52738d; background:#20384b; }
 html[data-theme="dark"] .tool-chest-item.active { border-color:#5d96bc; background:#203f53; }
 html[data-theme="dark"] .sidebar-note { background:#222b33; }
+html[data-theme="dark"] .takeoff-controls select,
+html[data-theme="dark"] .takeoff-actions button,
+html[data-theme="dark"] .takeoff-table-wrap { border-color:#3a4652; background:#20272f; color:#dbe3ea; }
+html[data-theme="dark"] .takeoff-table th { background:#28313a; color:#b8c3cd; }
+html[data-theme="dark"] .takeoff-table th,
+html[data-theme="dark"] .takeoff-table td { border-color:#35404b; }
 html[data-theme="dark"] .document-search-form input,
 html[data-theme="dark"] .document-search-form button,
 html[data-theme="dark"] .document-search-navigation,
