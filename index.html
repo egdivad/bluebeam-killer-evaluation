@@ -17,14 +17,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=db00ec461c45" />
+    <link rel="stylesheet" href="styles.css?v=472a11825a1e" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
     <header class="topbar">
       <div class="brand"><span class="brand-mark">BK</span><span class="brand-name"><span class="brand-title">Bluebeam Killer</span><small class="wip-badge" title="Evaluation build">Evaluation</small></span></div>
       <div class="document-title">
-        <button class="icon-button mobile-only" id="toggleSidebar" aria-label="Show pages"><span class="ui-icon icon-menu" aria-hidden="true"></span></button>
+        <button class="icon-button mobile-only" id="toggleSidebar" aria-label="Show document panels"><span class="ui-icon icon-menu" aria-hidden="true"></span></button>
         <div><strong id="fileName">Project Brief.pdf</strong><span id="saveState">All changes saved locally</span></div>
       </div>
       <div class="top-actions">
@@ -63,10 +63,31 @@
 
     <main class="workspace">
       <aside class="sidebar" id="sidebar">
-        <div class="panel-resizer panel-resizer-right" id="sidebarResizer" role="separator" aria-label="Resize pages panel" aria-orientation="vertical" tabindex="0"></div>
-        <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
-        <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
-        <div id="thumbnails" class="thumbnails"></div>
+        <div class="panel-resizer panel-resizer-right" id="sidebarResizer" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0"></div>
+        <div class="sidebar-tabs" role="tablist" aria-label="Document panels">
+          <button class="active" id="pagesTab" type="button" role="tab" aria-selected="true" aria-controls="pagesPanel" data-sidebar-tab="pages" title="Pages"><span class="ui-icon icon-file" aria-hidden="true"></span><span>Pages</span></button>
+          <button id="layersTab" type="button" role="tab" aria-selected="false" aria-controls="layersPanel" data-sidebar-tab="layers" title="Layers"><span class="ui-icon icon-layers" aria-hidden="true"></span><span>Layers</span></button>
+          <button id="toolChestTab" type="button" role="tab" aria-selected="false" aria-controls="toolChestPanel" data-sidebar-tab="tool-chest" title="Tool Chest"><span class="ui-icon icon-toolbox" aria-hidden="true"></span><span>Tool Chest</span></button>
+        </div>
+        <section class="sidebar-panel active" id="pagesPanel" role="tabpanel" aria-labelledby="pagesTab">
+          <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
+          <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
+          <div id="thumbnails" class="thumbnails"></div>
+        </section>
+        <section class="sidebar-panel" id="layersPanel" role="tabpanel" aria-labelledby="layersTab" hidden>
+          <div class="sidebar-heading"><span>Layers</span><span id="layerCount">0 layers</span></div>
+          <button class="insert-page-button" id="addLayerButton" type="button"><span class="ui-icon icon-plus" aria-hidden="true"></span>Add layer</button>
+          <div class="layer-list" id="layerList"></div>
+          <p class="sidebar-empty" id="layersEmpty">This document has no layers. New items use no layer.</p>
+        </section>
+        <section class="sidebar-panel" id="toolChestPanel" role="tabpanel" aria-labelledby="toolChestTab" hidden>
+          <div class="sidebar-heading"><span>Tool Chest</span><span id="toolChestCount">0 tools</span></div>
+          <div class="tool-chest-actions"><button id="saveSelectedTool" type="button" disabled><span class="ui-icon icon-plus" aria-hidden="true"></span>Save selected</button><button id="importBtxToolChestButton" type="button" title="Best-effort import from a Bluebeam BTX tool set.">BTX</button><button id="importJsonToolChestButton" type="button" title="Import a Bluebeam Killer JSON tool set.">JSON</button><button id="exportToolChestButton" type="button" disabled><span class="ui-icon icon-download" aria-hidden="true"></span>Export</button></div>
+          <input id="btxToolChestFileInput" type="file" accept=".btx" hidden /><input id="jsonToolChestFileInput" type="file" accept=".json,application/json" hidden />
+          <div class="tool-chest-list" id="toolChestList"></div>
+          <p class="sidebar-empty" id="toolChestEmpty">Save a selected item, or import a Bluebeam BTX or Bluebeam Killer JSON tool set.</p>
+          <p class="sidebar-note">BTX import is best effort. Files stay in this browser.</p>
+        </section>
       </aside>
 
       <section class="editor">
@@ -121,8 +142,8 @@
 
         <section class="markups-panel" id="markupsPanel" aria-label="Markups List" hidden>
           <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize or collapse Markups List" aria-orientation="horizontal" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
-          <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
-          <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
+          <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="layer">Layer</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="layer">Layer</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
         </section>
 
         <footer class="statusbar">
@@ -147,6 +168,7 @@
         <div class="inspector-content" id="inspectorContent" hidden>
           <div class="inspector-title"><span>Properties</span><button id="closeInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <label class="toggle-row selected-visibility"><span><strong>Visible on page</strong><small>Hide this item without deleting it.</small></span><input id="selectedVisibility" type="checkbox" role="switch" checked /></label>
+          <label class="selected-layer-field">Layer<select id="selectedLayer"><option value="">No layer</option></select><small>Assign this item to a document layer.</small></label>
           <div id="textProperties">
           <label>Text<textarea id="textValue" rows="4" spellcheck="true"></textarea></label>
           <label>Font<select id="fontFamily"><option value="original">Original font</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
@@ -262,6 +284,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=db00ec461c45"></script>
+    <script type="module" src="app.js?v=472a11825a1e"></script>
   </body>
 </html>
