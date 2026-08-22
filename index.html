@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=959c376eb634" />
+    <link rel="stylesheet" href="styles.css?v=bbce9cb084ae" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -82,7 +82,7 @@
           <button id="bookmarksTab" type="button" role="tab" aria-selected="false" aria-controls="bookmarksPanel" data-sidebar-tab="bookmarks" title="Bookmarks"><span class="ui-icon icon-bookmark" aria-hidden="true"></span><span>Bookmarks</span></button>
           <button id="layersTab" type="button" role="tab" aria-selected="false" aria-controls="layersPanel" data-sidebar-tab="layers" title="Layers"><span class="ui-icon icon-layers" aria-hidden="true"></span><span>Layers</span></button>
           <button id="toolChestTab" type="button" role="tab" aria-selected="false" aria-controls="toolChestPanel" data-sidebar-tab="tool-chest" title="Tool Chest"><span class="ui-icon icon-toolbox" aria-hidden="true"></span><span>Tool Chest</span></button>
-          <button id="takeoffTab" type="button" role="tab" aria-selected="false" aria-controls="takeoffPanel" data-sidebar-tab="takeoff" title="Takeoff Summary"><span class="ui-icon icon-list" aria-hidden="true"></span><span>Takeoff Summary</span></button>
+          <button id="takeoffTab" type="button" role="tab" aria-selected="false" aria-controls="takeoffPanel" data-sidebar-tab="takeoff" title="Takeoff Summary and Live Legends"><span class="ui-icon icon-list" aria-hidden="true"></span><small class="sidebar-live-badge" aria-hidden="true">Live</small><span>Takeoff Summary</span></button>
         </div>
         <section class="sidebar-panel active" id="pagesPanel" role="tabpanel" aria-labelledby="pagesTab">
           <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
@@ -133,12 +133,13 @@
           <p class="sidebar-note">The current BTX converter might not convert all Bluebeam tools correctly. Check imported tools before use. Files stay in this browser.</p>
         </section>
         <section class="sidebar-panel" id="takeoffPanel" role="tabpanel" aria-labelledby="takeoffTab" hidden>
-          <div class="sidebar-heading"><span>Takeoff Summary</span><span id="takeoffGroupCount">0 groups</span></div>
+          <div class="sidebar-heading"><span class="takeoff-title">Takeoff Summary <small class="live-feature-badge">Live</small></span><span id="takeoffGroupCount">0 groups</span></div>
           <div class="takeoff-controls">
             <label>Scope<select id="takeoffScope"><option value="document">Document</option><option value="page">Current page</option></select></label>
             <label>Group by<select id="takeoffGroupBy"><option value="type">Type</option><option value="subject">Subject</option><option value="layer">Layer</option><option value="page">Page</option><option value="scale">Scale</option><option value="unit">Unit</option></select></label>
           </div>
-          <div class="takeoff-actions"><button id="exportTakeoffCsv" type="button" disabled>CSV</button><button id="exportTakeoffJson" type="button" disabled>JSON</button><button id="placeTakeoffLegend" type="button" disabled><span class="ui-icon icon-plus" aria-hidden="true"></span>Place legend</button></div>
+          <div class="takeoff-actions"><button id="exportTakeoffCsv" type="button" disabled>CSV</button><button id="exportTakeoffJson" type="button" disabled>JSON</button><button id="placeTakeoffLegend" type="button" title="Place a summary table that updates when measurements change." disabled><span class="ui-icon icon-plus" aria-hidden="true"></span>Place live legend</button></div>
+          <div class="live-legend-callout" id="liveLegendCallout" role="status" hidden><strong>Live Legend is ready</strong><p>Place a summary table that updates when measurements change.</p><button id="dismissLiveLegendHint" type="button">Not now</button></div>
           <div class="takeoff-table-wrap"><table class="takeoff-table"><thead><tr><th>Group</th><th>Qty</th><th>Length</th><th>Perimeter</th><th>Area</th><th>Scale</th></tr></thead><tbody id="takeoffTableBody"></tbody></table></div>
           <p class="sidebar-empty" id="takeoffEmpty">Add measurements to create a takeoff summary.</p>
           <p class="sidebar-note">Measurements that use different scales or units stay in separate rows.</p>
@@ -490,6 +491,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=959c376eb634"></script>
+    <script type="module" src="app.js?v=bbce9cb084ae"></script>
   </body>
 </html>

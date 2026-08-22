@@ -200,7 +200,7 @@ export function pdfAnnotationSpec(annotation, pageGeometry, measurementLabel = "
   else if (annotation.type === "highlight") spec=highlightSpec(annotation, geometry);
   else if (annotation.type === "text") spec=freeTextSpec(annotation, geometry);
   else if (annotation.type === "sticky-note") spec=stickyNoteSpec(annotation, geometry);
-  if(spec){spec.appearanceRotation=geometry.rotation;if(canRotatePageItem(annotation)){const angle=normalizeRotation(annotation.rotation||0);spec.itemRotation=angle;if(angle){spec.appearanceContentRect=[...spec.rect];spec.rect=rotatedPdfRect(spec.rect,-angle);if(spec.calloutBox)spec.rectDifferences=[spec.calloutBox[0]-spec.rect[0],spec.calloutBox[1]-spec.rect[1],spec.rect[2]-spec.calloutBox[2],spec.rect[3]-spec.calloutBox[3]].map(value=>Math.max(0,value));}}if(spec.subtype==="FreeText")spec.rotation=geometry.rotation;}
+  if(spec){spec.appearanceRotation=geometry.rotation;if(canRotatePageItem(annotation)){const angle=normalizeRotation(annotation.rotation||0);spec.itemRotation=angle;if(angle){spec.appearanceContentRect=[...spec.rect];spec.rect=rotatedPdfRect(spec.rect,-angle);if(["Square","Circle"].includes(spec.subtype)){const inset=Math.max(0,(spec.width||0)/2),content=spec.appearanceContentRect;spec.rectDifferences=[content[0]-spec.rect[0]+inset,content[1]-spec.rect[1]+inset,spec.rect[2]-content[2]+inset,spec.rect[3]-content[3]+inset].map(value=>Math.max(0,value));}if(spec.calloutBox)spec.rectDifferences=[spec.calloutBox[0]-spec.rect[0],spec.calloutBox[1]-spec.rect[1],spec.rect[2]-spec.calloutBox[2],spec.rect[3]-spec.calloutBox[3]].map(value=>Math.max(0,value));}}if(spec.subtype==="FreeText")spec.rotation=geometry.rotation;}
   return spec;
 }
 
@@ -240,6 +240,7 @@ export function addPdfLibAnnotation(PDFLib, page, annotation, measurementLabel =
   if (spec.flag) { data.Flag = PDFLib.PDFBool.True;if (spec.flagDirection === 1) data.FlagDirection = PDFLib.PDFNumber.of(1); }
   if(spec.subtype==="Text"){data.Name=name(spec.iconName||"Note");data.Open=PDFLib.PDFBool.False;if(spec.state){data.State=text(spec.state);data.StateModel=text("Review");}}
   if(spec.subtype==="Stamp")data.Name=name(spec.stampName||"Custom");
+  if(spec.itemRotation)data.Rotation=PDFLib.PDFNumber.of(spec.itemRotation);
   if (spec.rotation) data.Rotate = PDFLib.PDFNumber.of(spec.rotation);
   data.AP = context.obj({ N: annotationAppearance(PDFLib,page,spec) });
   const reference = context.register(context.obj(data)), annots = page.node.lookupMaybe(name("Annots"), PDFLib.PDFArray);if (annots) annots.push(reference);else page.node.set(name("Annots"), context.obj([reference]));return true;
