@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="A focused browser PDF editor for highlights, inserted text, and visual text changes." />
+    <meta name="description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
     <meta property="og:title" content="Bluebeam Killer" />
-    <meta property="og:description" content="Highlight, insert, and replace visible PDF text in your browser." />
+    <meta property="og:description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
     <meta property="og:image" content="og.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Bluebeam Killer" />
-    <meta name="twitter:description" content="Edit PDFs in your browser." />
+    <meta name="twitter:description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
     <meta name="twitter:image" content="og.png" />
     <title>Bluebeam Killer</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=3a3bce8da686" />
+    <link rel="stylesheet" href="styles.css?v=959c376eb634" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -59,7 +59,18 @@
       <button data-markup-tool="polygon" aria-keyshortcuts="Shift+P"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Polygon</strong><small>Click points. Double-click to finish.</small></span><kbd class="measure-shortcut">Shift+P</kbd></button>
       <button data-markup-tool="callout" aria-keyshortcuts="Q"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Callout</strong><small>Drag from the arrow head</small></span><kbd class="measure-shortcut">Q</kbd></button>
       <button data-markup-tool="flag" aria-keyshortcuts="Shift+F"><span class="ui-icon icon-flag" aria-hidden="true"></span><span><strong>Flag</strong><small>Click to place a text flag</small></span><kbd class="measure-shortcut">Shift+F</kbd></button>
+      <button data-markup-tool="note" aria-keyshortcuts="N"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Sticky Note</strong><small>Click to place and add a note</small></span><kbd class="measure-shortcut">N</kbd></button>
       <button data-markup-tool="freehand"><span class="ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Freehand</strong><small>Draw with the pointer</small></span></button>
+    </div>
+
+    <div class="stamp-menu" id="stampMenu" hidden>
+      <div class="stamp-menu-heading"><strong>Stamp</strong><span>Standard and saved stamps</span></div>
+      <div class="stamp-preset-grid" id="standardStampPresets" aria-label="Standard stamps"></div>
+      <div class="stamp-saved-heading"><strong>Saved stamps</strong><span id="savedStampCount">0 saved</span></div>
+      <div class="stamp-preset-grid saved" id="savedStampPresets"></div>
+      <p class="stamp-empty" id="savedStampEmpty">No custom stamps are saved.</p>
+      <div class="stamp-menu-actions"><button type="button" id="customTextStampButton"><span class="ui-icon icon-type" aria-hidden="true"></span>Custom text</button><button type="button" id="customImageStampButton"><span class="ui-icon icon-file" aria-hidden="true"></span>Image stamp</button></div>
+      <input id="stampImageFileInput" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden />
     </div>
 
     <main class="workspace">
@@ -137,28 +148,33 @@
       <section class="editor">
         <nav class="toolbar" aria-label="PDF editing tools">
           <div class="edit-toolbar-row">
-            <div class="tool-group">
-            <button class="tool active" data-tool="select" title="Select text (V)"><span class="ui-icon icon-pointer" aria-hidden="true"></span>Select</button>
+            <div class="tool-group toolbar-primary">
+            <button class="tool active" data-tool="select" title="Select added items (V)"><span class="ui-icon icon-pointer" aria-hidden="true"></span>Select</button>
+            <button class="tool" data-tool="lasso" data-toolbar-overflow="125" data-overflow-label="Lasso" title="Lasso select added items (Shift+V)" aria-keyshortcuts="Shift+V"><span class="ui-icon icon-lasso" aria-hidden="true"></span>Lasso</button>
+            <button class="tool" id="selectionFilterButton" data-toolbar-overflow="124" data-overflow-label="Select by" title="Select by properties (Ctrl+Shift+F)" aria-keyshortcuts="Control+Shift+F" disabled><span class="ui-icon icon-list-filter" aria-hidden="true"></span>Select by</button>
             <button class="tool" data-tool="highlight" title="Highlight text (H)"><span class="ui-icon icon-highlighter" aria-hidden="true"></span>Highlight</button>
-            <button class="tool" data-tool="insert" title="Insert text (T)"><span class="ui-icon icon-type" aria-hidden="true"></span>Insert text</button>
-            <button class="tool" data-tool="edit" title="Edit existing text (Shift+E)" aria-keyshortcuts="Shift+E"><span class="ui-icon icon-text-cursor" aria-hidden="true"></span>Edit text</button>
+            <button class="tool" data-tool="insert" data-toolbar-overflow="120" data-overflow-label="Insert text" title="Insert text (T)"><span class="ui-icon icon-type" aria-hidden="true"></span>Insert text</button>
+            <button class="tool" data-tool="edit" data-toolbar-overflow="110" data-overflow-label="Edit text" title="Edit existing text (Shift+E)" aria-keyshortcuts="Shift+E"><span class="ui-icon icon-text-cursor" aria-hidden="true"></span>Edit text</button>
             <button class="tool" data-tool="markup" id="markupButton" title="Drawing markups"><span class="ui-icon icon-shapes" aria-hidden="true"></span>Markup</button>
             <button class="tool" data-tool="measure" id="measureButton" title="Measure drawing"><span class="ui-icon icon-ruler" aria-hidden="true"></span>Measure</button>
-            <button class="snap-toggle toolbar-snap" id="snapToContentButton" type="button" aria-pressed="false" aria-label="Snap measurements to PDF vector content" title="Snap measurements to PDF vector content" disabled><span class="ui-icon icon-magnet" aria-hidden="true"></span><span class="snap-label">Snap</span></button>
+            <button class="tool" data-tool="stamp" id="stampButton" data-toolbar-overflow="105" data-overflow-label="Stamp" title="Place a standard or custom stamp"><span class="ui-icon icon-stamp" aria-hidden="true"></span>Stamp</button>
+            <button class="snap-toggle toolbar-snap" id="snapToContentButton" type="button" data-toolbar-overflow="100" data-overflow-label="Snap" aria-pressed="false" aria-label="Snap measurements to PDF vector content" title="Snap measurements to PDF vector content" disabled><span class="ui-icon icon-magnet" aria-hidden="true"></span><span class="snap-label">Snap</span></button>
             </div>
-            <div class="highlight-palette" id="highlightPalette" aria-label="Highlight color" hidden><span>Color</span><button style="--highlight:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--highlight:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--highlight:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--highlight:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--highlight:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--highlight:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button><input id="highlightToolCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom highlight color" /></div>
-            <div class="divider"></div>
+            <div class="highlight-palette" id="highlightPalette" data-toolbar-overflow="90" aria-label="Highlight color" hidden><span>Color</span><button style="--highlight:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--highlight:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--highlight:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--highlight:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--highlight:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--highlight:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button><input id="highlightToolCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom highlight color" /></div>
+            <div class="divider" id="toolbarDivider"></div>
             <div class="tool-group compact">
-            <button class="icon-button" id="undoButton" title="Undo (Ctrl+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z" disabled><span class="ui-icon icon-undo" aria-hidden="true"></span></button>
-            <button class="icon-button" id="redoButton" title="Redo (Ctrl+Y)" aria-label="Redo" aria-keyshortcuts="Control+Y" disabled><span class="ui-icon icon-redo" aria-hidden="true"></span></button>
-            <button class="icon-button" id="copyItemButton" title="Copy selected markup or measurement (Ctrl+C)" aria-label="Copy selected markup or measurement" aria-keyshortcuts="Control+C" disabled><span class="ui-icon icon-copy" aria-hidden="true"></span></button>
-            <button class="icon-button" id="pasteItemButton" title="Paste next to copied item (Ctrl+V)" aria-label="Paste next to copied item" aria-keyshortcuts="Control+V" disabled><span class="ui-icon icon-paste" aria-hidden="true"></span></button>
-            <button class="icon-button" id="formatPainterButton" title="Copy the selected item format. Ctrl+Shift+C. Press Esc to stop." aria-label="Format Painter" aria-keyshortcuts="Control+Shift+C" aria-pressed="false" disabled><span class="ui-icon icon-paintbrush" aria-hidden="true"></span></button>
-            <button class="icon-button" id="deleteButton" title="Delete selected item (Delete)" aria-label="Delete selected item" aria-keyshortcuts="Delete" disabled><span class="ui-icon icon-trash" aria-hidden="true"></span></button>
-            <button class="icon-button" id="markupsListButton" title="Show Markups List" aria-label="Show Markups List" aria-pressed="false"><span class="ui-icon icon-list" aria-hidden="true"></span></button>
-            <button class="icon-button keyboard-button" id="keyboardShortcutsButton" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><span class="ui-icon icon-keyboard" aria-hidden="true"></span></button>
+            <button class="icon-button" id="undoButton" data-toolbar-overflow="80" data-overflow-label="Undo" title="Undo (Ctrl+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z" disabled><span class="ui-icon icon-undo" aria-hidden="true"></span></button>
+            <button class="icon-button" id="redoButton" data-toolbar-overflow="70" data-overflow-label="Redo" title="Redo (Ctrl+Y)" aria-label="Redo" aria-keyshortcuts="Control+Y" disabled><span class="ui-icon icon-redo" aria-hidden="true"></span></button>
+            <button class="icon-button" id="copyItemButton" data-toolbar-overflow="60" data-overflow-label="Copy" title="Copy selected markup or measurement (Ctrl+C)" aria-label="Copy selected markup or measurement" aria-keyshortcuts="Control+C" disabled><span class="ui-icon icon-copy" aria-hidden="true"></span></button>
+            <button class="icon-button" id="pasteItemButton" data-toolbar-overflow="50" data-overflow-label="Paste" title="Paste next to copied item: Ctrl+V&#10;Paste at mouse pointer: Ctrl+Shift+V" aria-label="Paste next to copied item with Ctrl+V, or paste at the mouse pointer with Ctrl+Shift+V" aria-keyshortcuts="Control+V Control+Shift+V" disabled><span class="ui-icon icon-paste" aria-hidden="true"></span></button>
+            <button class="icon-button" id="formatPainterButton" data-toolbar-overflow="40" data-overflow-label="Format Painter" title="Copy the selected item format. Ctrl+Shift+C. Press Esc to stop." aria-label="Format Painter" aria-keyshortcuts="Control+Shift+C" aria-pressed="false" disabled><span class="ui-icon icon-paintbrush" aria-hidden="true"></span></button>
+            <button class="icon-button" id="deleteButton" data-toolbar-overflow="30" data-overflow-label="Delete" title="Delete selected item (Delete)" aria-label="Delete selected item" aria-keyshortcuts="Delete" disabled><span class="ui-icon icon-trash" aria-hidden="true"></span></button>
+            <button class="icon-button" id="markupsListButton" data-toolbar-overflow="20" data-overflow-label="Markups List" title="Show Markups List" aria-label="Show Markups List" aria-pressed="false"><span class="ui-icon icon-list" aria-hidden="true"></span></button>
+            <button class="icon-button keyboard-button" id="keyboardShortcutsButton" data-toolbar-overflow="10" data-overflow-label="Keyboard shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><span class="ui-icon icon-keyboard" aria-hidden="true"></span></button>
             </div>
             <div class="toolbar-spacer"></div>
+            <button class="icon-button toolbar-overflow-button" id="toolbarOverflowButton" type="button" aria-label="More editing tools" aria-haspopup="menu" aria-expanded="false" title="More editing tools" hidden><span class="ui-icon icon-ellipsis" aria-hidden="true"></span></button>
+            <div class="toolbar-overflow-menu" id="toolbarOverflowMenu" role="menu" aria-label="More editing tools" hidden></div>
             <div class="zoom-controls">
               <button id="zoomOut" aria-label="Zoom out"><span class="ui-icon icon-minus" aria-hidden="true"></span></button><span id="zoomValue">100%</span><button id="zoomIn" aria-label="Zoom in"><span class="ui-icon icon-plus" aria-hidden="true"></span></button>
             </div>
@@ -168,10 +184,10 @@
         <div class="canvas-area" id="canvasArea">
           <div class="empty-state" id="emptyState">
             <div class="empty-badge">PDF</div>
-            <h1>Edit PDFs without leaving your browser.</h1>
-            <p>Open a document to highlight key text, add notes, and replace visible wording.</p>
-            <button class="button primary large" id="emptyOpenButton">Choose a PDF</button>
-            <span>Your file stays in this browser.</span>
+            <h1>Review, mark up, and measure PDFs in your browser.</h1>
+            <p>Edit text, add markups, measure drawings, manage pages, and export editable PDFs.</p>
+            <button class="button primary large" id="emptyOpenButton">Open a PDF</button>
+            <span>Everything stays on your device.</span>
           </div>
           <div class="page-stage" id="pageStage" hidden>
             <div class="page-shell" id="pageShell">
@@ -187,7 +203,7 @@
         <section class="markups-panel" id="markupsPanel" aria-label="Markups List" hidden>
           <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize or collapse Markups List" aria-orientation="horizontal" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
           <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="layer">Layer</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
-          <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="layer">Layer</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
+          <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="layer">Layer</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="author">Author</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th><th><button data-sort-key="created">Created</button></th><th><button data-sort-key="modified">Modified</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
         </section>
 
         <footer class="statusbar">
@@ -212,6 +228,25 @@
         <div class="inspector-content batch-properties" id="batchProperties" hidden>
           <div class="inspector-title"><span>Properties</span><button id="closeBatchInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <div class="batch-selection-summary"><strong id="batchSelectionCount">Multiple items selected</strong><small>Changes apply to compatible unlocked items.</small></div>
+          <section class="batch-property-group" id="batchGroupActions">
+            <h3>Group selected items</h3>
+            <p class="batch-arrange-note">Grouped items select and move together.</p>
+            <div class="batch-group-options" role="group" aria-label="Group selected items">
+              <button id="groupSelectionButton" type="button" title="Group the selected items so they select and move together. Ctrl+G." aria-keyshortcuts="Control+G"><span class="ui-icon icon-group" aria-hidden="true"></span><span>Group</span></button>
+              <button id="ungroupSelectionButton" type="button" title="Remove the selected items from their group. Ctrl+Shift+G." aria-keyshortcuts="Control+Shift+G"><span class="ui-icon icon-ungroup" aria-hidden="true"></span><span>Ungroup</span></button>
+            </div>
+          </section>
+          <section class="batch-property-group" id="batchArrangeGroup">
+            <h3>Arrange selected items</h3>
+            <p class="batch-arrange-note">Size commands use the first compatible selected item as the reference.</p>
+            <div class="batch-arrange-options" role="group" aria-label="Arrange selected items">
+              <button id="matchSelectionWidth" type="button" title="Make compatible items use the width of the first compatible selected item."><span class="ui-icon icon-match-width" aria-hidden="true"></span><span>Same width</span></button>
+              <button id="matchSelectionHeight" type="button" title="Make compatible items use the height of the first compatible selected item."><span class="ui-icon icon-match-height" aria-hidden="true"></span><span>Same height</span></button>
+              <button id="matchSelectionSize" type="button" title="Make compatible items use the width and height of the first compatible selected item."><span class="ui-icon icon-match-size" aria-hidden="true"></span><span>Same size</span></button>
+              <button id="distributeSelectionHorizontal" type="button" title="Keep the outside items fixed and make the horizontal gaps equal."><span class="ui-icon icon-space-horizontal" aria-hidden="true"></span><span>Space across</span></button>
+              <button id="distributeSelectionVertical" type="button" title="Keep the outside items fixed and make the vertical gaps equal."><span class="ui-icon icon-space-vertical" aria-hidden="true"></span><span>Space down</span></button>
+            </div>
+          </section>
           <section class="batch-property-group">
             <h3>Common properties</h3>
             <label>Visible on page<select id="batchVisibility"><option value="__mixed__">Mixed</option><option value="true">Visible</option><option value="false">Hidden</option></select></label>
@@ -222,6 +257,14 @@
             <label>Subject<div class="batch-apply-row"><input id="batchSubject" type="text" placeholder="Mixed" /><button id="applyBatchSubject" type="button">Apply</button></div></label>
             <label>Status<select id="batchStatus"><option value="__mixed__">Mixed</option><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
             <label>Comment<div class="batch-apply-row"><input id="batchComment" type="text" placeholder="Mixed" spellcheck="true" /><button id="applyBatchComment" type="button">Apply</button></div></label>
+          </section>
+          <section class="batch-property-group" id="batchStickyNoteGroup" hidden>
+            <h3>Sticky Note</h3>
+            <label>Note text<div class="batch-apply-row"><input id="batchStickyNoteText" type="text" placeholder="Mixed" spellcheck="true" /><button id="applyBatchStickyNoteText" type="button">Apply</button></div></label>
+            <label>Subject<div class="batch-apply-row"><input id="batchStickyNoteSubject" type="text" placeholder="Mixed" /><button id="applyBatchStickyNoteSubject" type="button">Apply</button></div></label>
+            <label>Author<div class="batch-apply-row"><input id="batchStickyNoteAuthor" type="text" placeholder="Mixed" /><button id="applyBatchStickyNoteAuthor" type="button">Apply</button></div></label>
+            <label>Status<select id="batchStickyNoteStatus"><option value="__mixed__">Mixed</option><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
+            <label>Note color<div class="color-field batch-color-field"><input id="batchStickyNoteColor" type="color" value="#f6c344" /><output id="batchStickyNoteColorValue">Mixed</output></div></label>
           </section>
           <section class="batch-property-group" id="batchTextGroup" hidden>
             <h3>Text</h3>
@@ -260,6 +303,10 @@
             <h3>Highlight</h3>
             <label>Highlight color<div class="color-field batch-color-field"><input id="batchHighlightColor" type="color" value="#ffd84d" /><output id="batchHighlightColorValue">Mixed</output></div></label>
           </section>
+          <section class="batch-property-group" id="batchRotationGroup" hidden>
+            <h3>Rotation</h3>
+            <label>Angle in degrees<input id="batchRotation" type="number" min="0" max="359" step="1" placeholder="Mixed" /><small>Use one angle for all selected objects.</small></label>
+          </section>
           <section class="batch-property-group" id="batchGeometryGroup" hidden>
             <h3>Geometry</h3>
             <label>Position and size<div class="geometry-grid"><span>X<input id="batchPosX" type="number" min="0" step="1" placeholder="Mixed" /></span><span>Y<input id="batchPosY" type="number" min="0" step="1" placeholder="Mixed" /></span><span>Width<input id="batchBoxWidth" type="number" min="1" step="1" placeholder="Mixed" /></span><span>Height<input id="batchBoxHeight" type="number" min="1" step="1" placeholder="Mixed" /></span></div></label>
@@ -270,6 +317,7 @@
           <div class="inspector-title"><span>Properties</span><button id="closeInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <label class="toggle-row selected-visibility"><span><strong>Visible on page</strong><small>Hide this item without deleting it.</small></span><input id="selectedVisibility" type="checkbox" role="switch" checked /></label>
           <label class="selected-layer-field">Layer<select id="selectedLayer"><option value="">No layer</option></select><small>Assign this item to a document layer.</small></label>
+          <label id="selectedRotationField" hidden>Rotation<input id="selectedRotation" type="number" min="0" max="359" step="1" value="0" /><small>Enter an angle from 0 to 359 degrees. Hold Shift while you drag the handle to use 15-degree steps.</small></label>
           <div id="textProperties">
           <label>Text<textarea id="textValue" rows="4" spellcheck="true"></textarea></label>
           <label>Font<select id="fontFamily"><option value="original">Original font</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
@@ -286,6 +334,18 @@
           <label>Align selected item to page<div class="page-alignment-options" id="pageAlignment" role="group" aria-label="Align selected item to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
           <label id="highlightColorField" hidden>Highlight color<div class="color-combo"><div class="swatches highlight-swatches"><button style="--swatch:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--swatch:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--swatch:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--swatch:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--swatch:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--swatch:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button></div><input id="highlightColorCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom color" /></div></label>
           <p class="edit-note" id="editNote">Export removes original text from edited pages. Edited and inserted text stays sharp and selectable.</p>
+          </div>
+          <div class="sticky-note-properties" id="stickyNoteProperties" hidden>
+            <div class="measurement-kind">Sticky Note</div>
+            <label>Note text<textarea id="stickyNoteText" rows="6" spellcheck="true"></textarea></label>
+            <label>Subject<input id="stickyNoteSubject" type="text" /></label>
+            <label>Author<input id="stickyNoteAuthor" type="text" /></label>
+            <label>Status<select id="stickyNoteStatus"><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
+            <label>Note color<div class="color-combo preset-picker" id="stickyNoteColorPresets"><div class="swatches"><button style="--swatch:#f6c344" data-preset="#f6c344" aria-label="Yellow"></button><button style="--swatch:#86e59d" data-preset="#86e59d" aria-label="Green"></button><button style="--swatch:#7cc8ff" data-preset="#7cc8ff" aria-label="Blue"></button><button style="--swatch:#ff9fc6" data-preset="#ff9fc6" aria-label="Pink"></button><button style="--swatch:#ffb66e" data-preset="#ffb66e" aria-label="Orange"></button><button style="--swatch:#c4a8ff" data-preset="#c4a8ff" aria-label="Purple"></button></div><div class="color-field"><input id="stickyNoteColor" type="color" value="#f6c344" aria-label="Custom note color" /><output id="stickyNoteColorValue">#F6C344</output></div></div></label>
+            <label>Position<div class="geometry-grid sticky-note-position"><span>X<input id="stickyNoteX" type="number" min="0" step="1" /></span><span>Y<input id="stickyNoteY" type="number" min="0" step="1" /></span></div></label>
+            <label>Align selected item to page<div class="page-alignment-options" id="stickyNotePageAlignment" role="group" aria-label="Align Sticky Note to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
+            <dl class="sticky-note-dates"><div><dt>Created</dt><dd id="stickyNoteCreated">Not available</dd></div><div><dt>Modified</dt><dd id="stickyNoteModified">Not available</dd></div></dl>
+            <p class="edit-note">Double-click the page icon to open this note. Editable PDF export keeps it as a standard PDF note.</p>
           </div>
           <div class="measurement-properties" id="measurementProperties" hidden>
             <div class="measurement-kind" id="measurementKind">Length measurement</div>
@@ -338,7 +398,22 @@
               <label>Vertical alignment<div class="alignment-options" id="markupFlagVerticalAlign" role="group" aria-label="Flag vertical text alignment"><button type="button" data-align="top"><span class="text-align-icon icon-text-top" aria-hidden="true"></span><span>Top</span></button><button type="button" data-align="middle" class="selected"><span class="text-align-icon icon-text-middle" aria-hidden="true"></span><span>Middle</span></button><button type="button" data-align="bottom"><span class="text-align-icon icon-text-bottom" aria-hidden="true"></span><span>Bottom</span></button></div></label>
               <label>Text color<div class="color-combo"><div class="swatches" id="markupFlagTextPresets"><button style="--swatch:#ffffff" data-preset="#ffffff" aria-label="White"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#dc2626" data-preset="#dc2626" aria-label="Red"></button></div><div class="color-field"><input id="markupFlagTextColor" type="color" value="#ffffff" aria-label="Custom flag text color" /><output id="markupFlagTextColorValue">#FFFFFF</output></div></div></label>
             </div>
-            <label>Line thickness<div class="field-row"><input id="markupLineWidth" type="range" min="0.5" max="10" step="0.5" value="2" /><output id="markupLineWidthValue">2 pt</output></div></label>
+            <div id="markupStampFields" hidden>
+              <div id="markupStampTextFields">
+                <label>Stamp text<textarea id="markupStampText" rows="3" spellcheck="true"></textarea></label>
+                <label>Font<select id="markupStampFont"><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
+                <label>Font size<div class="field-row"><input id="markupStampFontSize" type="range" min="8" max="48" value="24" /><output id="markupStampFontSizeValue">24 pt</output></div></label>
+                <label>Text style<div class="text-style-options" id="markupStampStyleControls" role="group" aria-label="Stamp text style"><button type="button" data-text-style="bold" aria-pressed="true"><strong>B</strong><span>Bold</span></button><button type="button" data-text-style="italic" aria-pressed="false"><em>I</em><span>Italic</span></button><button type="button" data-text-style="underline" aria-pressed="false"><span class="underline-letter">U</span><span>Underline</span></button></div></label>
+                <label>Horizontal alignment<div class="alignment-options" id="markupStampHorizontalAlign" role="group" aria-label="Stamp horizontal text alignment"><button type="button" data-align="left"><span class="text-align-icon icon-text-left" aria-hidden="true"></span><span>Left</span></button><button type="button" data-align="center" class="selected"><span class="text-align-icon icon-text-center" aria-hidden="true"></span><span>Center</span></button><button type="button" data-align="right"><span class="text-align-icon icon-text-right" aria-hidden="true"></span><span>Right</span></button></div></label>
+                <label>Vertical alignment<div class="alignment-options" id="markupStampVerticalAlign" role="group" aria-label="Stamp vertical text alignment"><button type="button" data-align="top"><span class="text-align-icon icon-text-top" aria-hidden="true"></span><span>Top</span></button><button type="button" data-align="middle" class="selected"><span class="text-align-icon icon-text-middle" aria-hidden="true"></span><span>Middle</span></button><button type="button" data-align="bottom"><span class="text-align-icon icon-text-bottom" aria-hidden="true"></span><span>Bottom</span></button></div></label>
+                <label>Text color<div class="color-combo preset-picker" id="markupStampTextPresets"><div class="swatches"><button style="--swatch:#b33427" data-preset="#b33427" aria-label="Red"></button><button style="--swatch:#1d4ed8" data-preset="#1d4ed8" aria-label="Blue"></button><button style="--swatch:#126b4a" data-preset="#126b4a" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="markupStampTextColor" type="color" value="#b33427" aria-label="Custom stamp text color" /><output id="markupStampTextColorValue">#B33427</output></div></div></label>
+              </div>
+              <div id="markupStampImageFields" hidden><p class="edit-note" id="markupStampImageStatus">This stamp uses a local image.</p><button class="button secondary stamp-image-replace" id="replaceStampImageButton" type="button">Replace image</button></div>
+              <label>Position and size<div class="geometry-grid"><span>X<input id="markupStampX" type="number" min="0" step="1" /></span><span>Y<input id="markupStampY" type="number" min="0" step="1" /></span><span>Width<input id="markupStampWidth" type="number" min="12" step="1" /></span><span>Height<input id="markupStampHeight" type="number" min="12" step="1" /></span></div></label>
+              <label>Align selected item to page<div class="page-alignment-options" id="markupStampPageAlignment" role="group" aria-label="Align stamp to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
+              <button class="button secondary stamp-save-preset" id="saveStampPresetButton" type="button" title="Save this stamp in the Stamp menu in this browser.">Save as stamp preset</button>
+            </div>
+            <label>Line thickness<div class="field-row"><input id="markupLineWidth" type="range" min="0" max="10" step="0.5" value="2" /><output id="markupLineWidthValue">2 pt</output></div></label>
             <label>Line color<div class="color-combo preset-picker" id="markupLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="markupLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="markupLineColorValue">#D04A3A</output></div></div></label>
             <label>Line type<select id="markupLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
             <div id="markupArrowFields"><label id="markupStartArrowField">Start arrow<select id="markupStartArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label><label id="markupEndArrowField">End arrow<select id="markupEndArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label></div>
@@ -355,33 +430,54 @@
         </div>
       </aside>
     </main>
+    <dialog class="selection-filter-dialog" id="selectionFilterDialog" aria-labelledby="selectionFilterTitle">
+      <div class="selection-filter-heading"><div><span>Advanced selection</span><h2 id="selectionFilterTitle">Select by properties</h2></div><button id="closeSelectionFilter" type="button" aria-label="Close selection filters"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+      <p>Choose one page and combine the filters. Hidden items are ignored. Locked items can be selected.</p>
+      <div class="selection-filter-body">
+        <div class="selection-filter-grid">
+          <label>Page<select id="selectionFilterPage"></select><small>Changing the page opens it before selection.</small></label>
+          <label>Object type<select id="selectionFilterType"></select></label>
+          <label>Layer<select id="selectionFilterLayer"></select></label>
+          <label>Colour<div class="selection-filter-color-picker"><select id="selectionFilterColor" tabindex="-1" aria-hidden="true"></select><button id="selectionFilterColorButton" type="button" aria-label="Colour filter" aria-haspopup="listbox" aria-controls="selectionFilterColorMenu" aria-expanded="false"><span class="selection-filter-option-swatch any" aria-hidden="true"></span><span id="selectionFilterColorLabel">Any colour</span></button><div class="selection-filter-color-menu" id="selectionFilterColorMenu" role="listbox" aria-label="Colour" hidden></div></div></label>
+        </div>
+        <div class="selection-filter-summary"><span class="selection-filter-swatch" id="selectionFilterSwatch" hidden></span><strong id="selectionFilterCount">0 items match</strong><small>All active filters must match.</small></div>
+        <div class="selection-filter-actions"><button class="button secondary" id="cancelSelectionFilter" type="button" title="Close this panel without changing the selection.">Cancel</button><button class="button secondary" id="removeSelectionFilter" type="button" title="Keep the current selection, but remove all matching items from it.">Remove</button><button class="button secondary" id="addSelectionFilter" type="button" title="Keep the current selection and add all matching items to it.">Add</button><button class="button primary" id="replaceSelectionFilter" type="button" title="Clear the current selection, then select all matching items.">Select matches</button></div>
+      </div>
+    </dialog>
     <dialog class="shortcut-dialog" id="shortcutDialog" aria-labelledby="shortcutTitle">
       <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <div class="shortcut-sections">
-        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div></dl></section>
+        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd></dd></div><div><dt>Lasso selection</dt><dd><kbd>Shift+V</kbd></dd></div><div><dt>Select by properties</dt><dd><kbd>Ctrl+Shift+F</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div></dl></section>
         <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Search document</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
         <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
-        <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
+        <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Sticky Note</dt><dd><kbd>N</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
         <section><h3>Measurements</h3><dl><div><dt>Undo last draft point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected area or perimeter point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Length</dt><dd><kbd>Shift+Alt+L</kbd></dd></div><div><dt>Polyline</dt><dd><kbd>Shift+Alt+Q</kbd></dd></div><div><dt>Area</dt><dd><kbd>Shift+Alt+A</kbd></dd></div><div><dt>Perimeter</dt><dd><kbd>Shift+Alt+P</kbd></dd></div><div><dt>Diameter</dt><dd><kbd>Shift+Alt+D</kbd></dd></div><div><dt>Angle</dt><dd><kbd>Shift+Alt+G</kbd></dd></div><div><dt>Count</dt><dd><kbd>Shift+Alt+C</kbd></dd></div></dl></section>
-        <section><h3>Edit and view</h3><dl><div><dt>Select all added page objects</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Add or remove one item from selection</dt><dd><kbd>Ctrl</kbd> + click</dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy selected item</dt><dd><kbd>Ctrl+C</kbd></dd></div><div><dt>Paste next to copied item</dt><dd><kbd>Ctrl+V</kbd></dd></div><div><dt>Paste at mouse pointer</dt><dd><kbd>Ctrl+Shift+V</kbd></dd></div><div><dt>Format Painter</dt><dd><kbd>Ctrl+Shift+C</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
+        <section><h3>Edit and view</h3><dl><div><dt>Select all added page objects</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Add or remove one item from selection</dt><dd><kbd>Ctrl</kbd> + click</dd></div><div><dt>Group / ungroup selected items</dt><dd><kbd>Ctrl+G</kbd> / <kbd>Ctrl+Shift+G</kbd></dd></div><div><dt>Move selected items</dt><dd><kbd>Arrow keys</kbd></dd></div><div><dt>Move selected items by 10 units</dt><dd><kbd>Shift</kbd> + <kbd>Arrow</kbd></dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy selected item</dt><dd><kbd>Ctrl+C</kbd></dd></div><div><dt>Paste next to copied item</dt><dd><kbd>Ctrl+V</kbd></dd></div><div><dt>Paste at mouse pointer</dt><dd><kbd>Ctrl+Shift+V</kbd></dd></div><div><dt>Format Painter</dt><dd><kbd>Ctrl+Shift+C</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
       </div>
     </dialog>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
       <div class="settings-heading"><div><span>Preferences</span><h2 id="settingsTitle">Settings</h2></div><button id="closeSettings" type="button" aria-label="Close settings"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <div class="settings-body">
         <section><h3>Appearance</h3><label>Theme<select id="settingsTheme"><option value="system">Use system setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label></section>
-            <section><h3>Editing defaults</h3><p id="savedDefaultsSummary">No custom item defaults are saved.</p><button class="button secondary" id="resetItemDefaults" type="button" title="Restore built-in properties for highlights, inserted text, markups, and measurements.">Reset all item defaults</button></section>
+            <section><h3>Editing defaults</h3><p id="savedDefaultsSummary">No custom item defaults are saved.</p><button class="button secondary" id="resetItemDefaults" type="button" title="Restore built-in properties for highlights, inserted text, Sticky Notes, markups, and measurements.">Reset all item defaults</button></section>
         <section><h3>Interface</h3><label>Default page layout<select id="settingsPageLayout"><option value="single">Single page</option><option value="continuous">Continuous pages</option><option value="side">Side-by-side</option><option value="continuous-side">Continuous side-by-side</option></select></label><label class="settings-check"><input id="settingsSnapDefault" type="checkbox" /> Enable vector snap when the app opens</label><label class="settings-check"><input id="settingsCursorHints" type="checkbox" /> Show delayed tool hints near the cursor</label><button class="button secondary" id="resetPanelLayout" type="button" title="Restore the original panel sizes and expanded states.">Reset panel layout</button></section>
         <section><h3>Import and export</h3><p>Move preferences to another browser or computer with a JSON file.</p><div class="settings-actions"><button class="button secondary" id="importPreferences" type="button" title="Import and replace the preferences in this browser.">Import preferences</button><button class="button secondary" id="exportPreferences" type="button" title="Download all preferences as a JSON file.">Export preferences</button></div><input id="preferenceFileInput" type="file" accept="application/json,.json" hidden /></section>
+        <section><h3>Local recovery</h3><p id="recoverySettingsStatus">Checking for saved work…</p><small class="recovery-settings-details" id="recoverySettingsDetails">The app saves the current open document after a change.</small><div class="settings-actions"><button class="button secondary" id="restoreRecoveryButton" type="button" title="Open the latest document work saved in this browser." disabled>Restore saved work</button><button class="button secondary" id="deleteRecoveryButton" type="button" title="Delete saved document recovery data from this browser." disabled>Delete saved data</button></div></section>
         <section class="settings-danger"><h3>Reset</h3><p>Restore all app preferences and item defaults.</p><button class="button secondary" id="resetAllPreferences" type="button" title="Restore every preference to its built-in value.">Reset all preferences</button></section>
-        <p class="settings-storage-note">Preferences are stored in this browser. They are not included in exported PDFs.</p>
+        <p class="settings-storage-note">Preferences and recovery data are stored in this browser. They are not included in exported PDFs.</p>
       </div>
+    </dialog>
+    <dialog class="recovery-dialog" id="recoveryDialog" aria-labelledby="recoveryDialogTitle">
+      <div class="recovery-dialog-heading"><div><span>Local recovery</span><h2 id="recoveryDialogTitle">Restore saved work?</h2></div><button id="keepRecoveryButton" type="button" aria-label="Close recovery options"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+      <p>The app found unfinished document work in this browser. Check the document name and save time before you restore it.</p>
+      <dl class="recovery-summary"><div><dt>Document</dt><dd id="recoveryDocumentName">Untitled.pdf</dd></div><div><dt>Saved</dt><dd id="recoverySavedAt">—</dd></div><div><dt>Pages</dt><dd id="recoveryPageCount">0</dd></div><div><dt>Added items</dt><dd id="recoveryItemCount">0</dd></div></dl>
+      <div class="recovery-actions"><button class="button secondary" id="deleteRecovery" type="button">Delete saved data</button><button class="button secondary" id="keepRecovery" type="button">Keep for later</button><button class="button primary" id="restoreRecovery" type="button">Restore saved work</button></div>
     </dialog>
     <dialog class="export-dialog" id="exportDialog" aria-labelledby="exportDialogTitle">
       <div class="export-dialog-heading"><div><span>Export PDF</span><h2 id="exportDialogTitle">Choose an export type</h2></div><button id="cancelExport" type="button" aria-label="Close export options"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <p>Editable annotations can be selected in Bluebeam and other PDF editors. Flattened graphics keep the current fixed appearance.</p>
       <div class="export-choices" id="exportChoices">
-        <button type="button" data-export-mode="editable"><span class="export-choice-icon ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Editable PDF</strong><small>Keep markups, highlights, text boxes, and measurements as PDF annotations.</small></span><em>Recommended</em></button>
+        <button type="button" data-export-mode="editable"><span class="export-choice-icon ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Editable PDF</strong><small>Keep markups, highlights, text boxes, Sticky Notes, and measurements as PDF annotations.</small></span><em>Recommended</em></button>
         <button type="button" data-export-mode="flattened"><span class="export-choice-icon ui-icon icon-file" aria-hidden="true"></span><span><strong>Flattened PDF</strong><small>Place all changes in the page content. These items cannot be selected as markups.</small></span></button>
       </div>
     </dialog>
@@ -394,6 +490,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=3a3bce8da686"></script>
+    <script type="module" src="app.js?v=959c376eb634"></script>
   </body>
 </html>

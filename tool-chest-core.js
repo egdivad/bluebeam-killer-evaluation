@@ -1,3 +1,5 @@
+import { sanitizeStampPreset } from "./stamp-core.js?v=2";
+
 const TOOL_CHEST_VERSION = 1;
 const SUPPORTED_TYPES = new Set(["text", "highlight", "markup", "measurement"]);
 const OMIT_FIELDS = new Set(["id", "page", "pageId", "layerId", "layerName", "layerVisible", "layerLocked", "layerPrintable", "deleted", "visible", "status", "comment", "x", "y", "sourceX", "sourceY", "sourceW", "sourceH", "rects", "countValue", "measurementScale"]);
@@ -28,8 +30,9 @@ export function captureTool(item, name, id = crypto.randomUUID()) {
 export function sanitizeTool(tool) {
   if (!tool || typeof tool !== "object" || typeof tool.properties !== "object") return null;
   const kind = String(tool.kind || "");
-  if (!/^(text|highlight|markup:(line|arrow|rectangle|ellipse|cloud|polygon|freehand|flag|callout|legend)|measurement:(length|polyline|area|perimeter|diameter|angle|count))$/.test(kind)) return null;
-  return { id: String(tool.id || crypto.randomUUID()), name: cleanName(tool.name, kind), kind, properties: clone(tool.properties), source: tool.source === "bluebeam" ? "bluebeam" : "bluebeam-killer" };
+  if (!/^(text|highlight|markup:(line|arrow|rectangle|ellipse|cloud|polygon|freehand|flag|callout|legend|stamp)|measurement:(length|polyline|area|perimeter|diameter|angle|count))$/.test(kind)) return null;
+  let properties=clone(tool.properties);if(kind==="markup:stamp"){const stamp=sanitizeStampPreset({id:tool.id,name:tool.name,...properties});if(!stamp)return null;const{id,name,builtIn,...safe}=stamp;properties={type:"markup",markupKind:"stamp",...safe,subject:cleanName(properties.subject,"Stamp"),comment:typeof properties.comment==="string"?properties.comment.slice(0,5000):"",status:typeof properties.status==="string"?properties.status.slice(0,80):"None"};}
+  return { id: String(tool.id || crypto.randomUUID()), name: cleanName(tool.name, kind), kind, properties, source: tool.source === "bluebeam" ? "bluebeam" : "bluebeam-killer" };
 }
 
 export function exportToolChest(tools = []) { return JSON.stringify({ app: "Bluebeam Killer", version: TOOL_CHEST_VERSION, tools: tools.map(sanitizeTool).filter(Boolean) }, null, 2); }

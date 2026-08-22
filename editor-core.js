@@ -5,5 +5,7 @@ export * from "./measurement-core.js";
 export * from "./page-core.js";
 export * from "./page-rotation-core.js";
 export * from "./page-tools-core.js";
+export * from "./rotation-core.js";
 export * from "./shortcut-core.js";
+export * from "./sticky-note-core.js";
 export * from "./text-core.js";

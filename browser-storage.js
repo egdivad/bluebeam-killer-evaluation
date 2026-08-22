@@ -1,7 +1,9 @@
 import { PREFERENCES_KEY, createPreferences, parsePreferences, sanitizePreferences } from "./preferences-core.js";
 import { sanitizeTool } from "./tool-chest-core.js";
+import { sanitizeStampPreset } from "./stamp-core.js";
 
 export const TOOL_CHEST_KEY = "bluebeam-killer-tool-chest";
+export const STAMP_PRESETS_KEY = "bluebeam-killer-stamp-presets";
 
 export function loadUserPreferences(storage = localStorage) {
   try {
@@ -51,6 +53,26 @@ export function saveToolChest(tools, storage = localStorage) {
     return true;
   } catch (error) {
     console.warn("The Tool Chest could not be saved.", error);
+    return false;
+  }
+}
+
+export function loadStampPresets(storage = localStorage) {
+  try {
+    const value = JSON.parse(storage.getItem(STAMP_PRESETS_KEY) || "[]");
+    return Array.isArray(value) ? value.map(item => sanitizeStampPreset(item)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStampPresets(presets, storage = localStorage) {
+  try {
+    const safe = Array.isArray(presets) ? presets.map(item => sanitizeStampPreset(item)).filter(Boolean) : [];
+    storage.setItem(STAMP_PRESETS_KEY, JSON.stringify(safe));
+    return true;
+  } catch (error) {
+    console.warn("Stamp presets could not be saved.", error);
     return false;
   }
 }
