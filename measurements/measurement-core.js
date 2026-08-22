@@ -1,4 +1,5 @@
-import { pointDistance } from "./geometry-core.js";
+import { pointDistance } from "../shared/geometry-core.js";
+import { DEFAULT_MEASUREMENT_PRECISION, normalizeMeasurementPrecision } from "./measurement-scale-core.js?v=1";
 
 export function measurementLineDash(lineType, factor = 1) {
   const patterns = {
@@ -77,11 +78,11 @@ export function angleDegrees(points = []) {
   return angle;
 }
 
-export function calibrateDrawingScale(points, knownDistance, unit = "mm") {
+export function calibrateDrawingScale(points, knownDistance, unit = "mm", precision = DEFAULT_MEASUREMENT_PRECISION) {
   const rawDistance = pointDistance(points?.[0], points?.[1]);
   const distance = Number(knownDistance);
   if (!(rawDistance > 0) || !(distance > 0)) return null;
-  return { unitsPerPoint: distance / rawDistance, unit };
+  return { unitsPerPoint: distance / rawDistance, unit, precision: normalizeMeasurementPrecision(precision) };
 }
 
 export function measurementValue(kind, points = [], scale = { unitsPerPoint: 1, unit: "pt" }) {
@@ -118,11 +119,12 @@ export function measurementFillBoundary(kind, points = [], segmentCount = 48) {
   });
 }
 
-export function formatMeasurement(kind, value, unit = "mm") {
+export function formatMeasurement(kind, value, unit = "mm", precision = DEFAULT_MEASUREMENT_PRECISION) {
   if (kind === "count") return String(Math.round(value));
-  if (kind === "angle") return `${Math.round(value * 10) / 10}°`;
-  const rounded = Math.round(value * 100) / 100;
-  return kind === "area" ? `${rounded} ${unit}²` : `${rounded} ${unit}`;
+  const places = normalizeMeasurementPrecision(precision), number = Number(value);
+  const formatted = Number.isFinite(number) ? (Math.abs(number) < 10 ** -(places + 2) ? 0 : number).toFixed(places) : "0";
+  if (kind === "angle") return `${formatted}°`;
+  return kind === "area" ? `${formatted} ${unit}²` : `${formatted} ${unit}`;
 }
 
 export function measurementBounds(points = []) {

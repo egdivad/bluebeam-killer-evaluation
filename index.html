@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=bbce9cb084ae" />
+    <link rel="stylesheet" href="styles.css?v=b696af6b8c40" />
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   </head>
   <body>
@@ -40,6 +40,7 @@
     <div class="measure-menu" id="measureMenu" hidden>
       <div class="measure-menu-heading"><strong>Measure</strong><span id="measureScaleStatus">Scale not set</span></div>
       <button data-measure-tool="calibrate"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><span><strong>Set scale</strong><small>Calibrate from two points</small></span></button>
+      <button id="scalePresetButton" type="button"><span class="ui-icon icon-ruler" aria-hidden="true"></span><span><strong>Scale presets</strong><small>Apply scale, unit, and precision</small></span></button>
       <button data-measure-tool="length" aria-keyshortcuts="Alt+Shift+L"><span class="ui-icon icon-ruler" aria-hidden="true"></span><span><strong>Length</strong><small>Two points</small></span><kbd class="measure-shortcut">Shift+Alt+L</kbd></button>
       <button data-measure-tool="polyline" aria-keyshortcuts="Alt+Shift+Q"><span class="ui-icon icon-route" aria-hidden="true"></span><span><strong>Polyline</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+Q</kbd></button>
       <button data-measure-tool="area" aria-keyshortcuts="Alt+Shift+A"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Area</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+A</kbd></button>
@@ -461,6 +462,7 @@
           <div class="settings-body">
         <section><h3>Appearance</h3><label>Theme<select id="settingsTheme"><option value="system">Use system setting</option><option value="light">Light</option><option value="dark">Dark</option></select></label></section>
             <section><h3>Editing defaults</h3><p id="savedDefaultsSummary">No custom item defaults are saved.</p><button class="button secondary" id="resetItemDefaults" type="button" title="Restore built-in properties for highlights, inserted text, Sticky Notes, markups, and measurements.">Reset all item defaults</button></section>
+        <section><h3>Measurement scales</h3><p id="scalePresetSummary">Use standard or saved drawing scales.</p><button class="button secondary" id="manageScalePresets" type="button" title="Apply a drawing scale and manage saved scale presets.">Manage scale presets</button></section>
         <section><h3>Interface</h3><label>Default page layout<select id="settingsPageLayout"><option value="single">Single page</option><option value="continuous">Continuous pages</option><option value="side">Side-by-side</option><option value="continuous-side">Continuous side-by-side</option></select></label><label class="settings-check"><input id="settingsSnapDefault" type="checkbox" /> Enable vector snap when the app opens</label><label class="settings-check"><input id="settingsCursorHints" type="checkbox" /> Show delayed tool hints near the cursor</label><button class="button secondary" id="resetPanelLayout" type="button" title="Restore the original panel sizes and expanded states.">Reset panel layout</button></section>
         <section><h3>Import and export</h3><p>Move preferences to another browser or computer with a JSON file.</p><div class="settings-actions"><button class="button secondary" id="importPreferences" type="button" title="Import and replace the preferences in this browser.">Import preferences</button><button class="button secondary" id="exportPreferences" type="button" title="Download all preferences as a JSON file.">Export preferences</button></div><input id="preferenceFileInput" type="file" accept="application/json,.json" hidden /></section>
         <section><h3>Local recovery</h3><p id="recoverySettingsStatus">Checking for saved work…</p><small class="recovery-settings-details" id="recoverySettingsDetails">The app saves the current open document after a change.</small><div class="settings-actions"><button class="button secondary" id="restoreRecoveryButton" type="button" title="Open the latest document work saved in this browser." disabled>Restore saved work</button><button class="button secondary" id="deleteRecoveryButton" type="button" title="Delete saved document recovery data from this browser." disabled>Delete saved data</button></div></section>
@@ -484,13 +486,22 @@
     </dialog>
     <dialog class="scale-dialog" id="scaleDialog" aria-labelledby="scaleDialogTitle">
       <form id="scaleForm">
-        <div class="scale-dialog-heading"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><div><strong id="scaleDialogTitle">Set drawing scale</strong><small>Enter the real distance between the two selected points.</small></div></div>
-        <label>Known distance<input id="scaleDistance" type="number" min="0.0001" step="any" value="1" required /></label>
+        <div class="scale-dialog-heading"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><div><strong id="scaleDialogTitle">Set drawing scale</strong><small id="scaleDialogDescription">Enter the real distance between the two selected points.</small></div></div>
+        <p class="scale-current" id="scaleCurrentStatus">Scale not set</p>
+        <div id="scaleCalibrationFields"><label>Known distance<input id="scaleDistance" type="number" min="0.0001" step="any" value="1" /></label></div>
+        <div class="scale-preset-fields" id="scalePresetFields" hidden>
+          <label>Scale preset<select id="scalePreset"></select></label>
+          <label>Drawing scale<span class="scale-ratio-input"><span>1 :</span><input id="scaleRatio" type="number" min="0.0001" max="1000000" step="any" value="100" /></span></label>
+          <div class="scale-preset-actions"><button class="button secondary" id="saveScalePreset" type="button" title="Save this ratio, unit, and precision as a custom preset.">Save preset</button><button class="button secondary" id="deleteScalePreset" type="button" title="Delete the selected custom preset." disabled>Delete preset</button></div>
+        </div>
         <label>Unit<select id="scaleUnit"><option value="mm">Millimetres (mm)</option><option value="cm">Centimetres (cm)</option><option value="m">Metres (m)</option><option value="in">Inches (in)</option><option value="ft">Feet (ft)</option></select></label>
-        <div class="scale-dialog-actions"><button class="button secondary" id="cancelScale" type="button">Cancel</button><button class="button primary" type="submit">Set scale</button></div>
+        <label>Decimal precision<select id="scalePrecision"><option value="0">0 decimal places</option><option value="1">1 decimal place</option><option value="2">2 decimal places</option><option value="3">3 decimal places</option><option value="4">4 decimal places</option><option value="5">5 decimal places</option><option value="6">6 decimal places</option></select></label>
+        <label>Apply to<select id="scaleApplyScope"><option value="current">Current page</option><option value="selected">Selected pages</option><option value="all">All pages</option></select></label>
+        <label class="scale-check"><input id="scaleUpdateExisting" type="checkbox" /> Update existing measurements on these pages</label>
+        <div class="scale-dialog-actions"><button class="button secondary" id="cancelScale" type="button">Cancel</button><button class="button primary" id="applyScale" type="submit">Set scale</button></div>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=bbce9cb084ae"></script>
+    <script type="module" src="app.js?v=b696af6b8c40"></script>
   </body>
 </html>

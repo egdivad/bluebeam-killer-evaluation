@@ -1,6 +1,6 @@
 import { PREFERENCES_KEY, createPreferences, parsePreferences, sanitizePreferences } from "./preferences-core.js";
-import { sanitizeTool } from "./tool-chest-core.js";
-import { sanitizeStampPreset } from "./stamp-core.js";
+import { sanitizeTool } from "../annotations/tool-chest-core.js";
+import { sanitizeStampPreset } from "../annotations/stamp-core.js";
 
 export const TOOL_CHEST_KEY = "bluebeam-killer-tool-chest";
 export const STAMP_PRESETS_KEY = "bluebeam-killer-stamp-presets";

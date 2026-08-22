@@ -1,5 +1,6 @@
-import { MARKUP_FORMAT_KEYS, MEASUREMENT_FORMAT_KEYS } from "./markup-core.js?v=23";
-import { STICKY_NOTE_FORMAT_KEYS } from "./sticky-note-core.js?v=1";
+import { MARKUP_FORMAT_KEYS, MEASUREMENT_FORMAT_KEYS } from "../annotations/markup-core.js?v=23";
+import { STICKY_NOTE_FORMAT_KEYS } from "../annotations/sticky-note-core.js?v=1";
+import { sanitizeMeasurementScalePreferences } from "../measurements/measurement-scale-core.js?v=1";
 
 export const PREFERENCES_KEY="bluebeam-killer-preferences";
 export const PREFERENCES_VERSION=1;
@@ -10,7 +11,7 @@ export const HIGHLIGHT_FORMAT_KEYS=["highlightColor"];
 
 const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),statuses=new Set(["None","Accepted","Rejected","Completed","Cancelled"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor","highlightColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","borderWidth","lineWidth","shadeOpacity","rotation"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength","showAreaValue"]);
 
-export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},highlightDefaults:{},markupDefaults:{},measurementDefaults:{},stickyNoteDefaults:{},interface:{sidebarSize:280,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false,liveLegendHintShown:false}};}
+export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},highlightDefaults:{},markupDefaults:{},measurementDefaults:{},measurementScale:sanitizeMeasurementScalePreferences(),stickyNoteDefaults:{},interface:{sidebarSize:280,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false,liveLegendHintShown:false}};}
 
 function safeNumber(value,min,max){const number=Number(value);return Number.isFinite(number)?Math.max(min,Math.min(max,number)):null;}
 function safeStyleValue(key,value){
@@ -35,7 +36,7 @@ function sanitizeDefaultMap(input,types,keys){const result={};if(!input||typeof 
 export function sanitizePreferences(input={}){
   const result=createPreferences();if(!input||typeof input!=="object"||Array.isArray(input))return result;
   if(themes.has(input.theme))result.theme=input.theme;if(layouts.has(input.pageLayout))result.pageLayout=input.pageLayout;if(typeof input.snapToContent==="boolean")result.snapToContent=input.snapToContent;if(typeof input.cursorHints==="boolean")result.cursorHints=input.cursorHints;
-  result.textDefaults=sanitizeDefaultMap(input.textDefaults,["insert"],TEXT_FORMAT_KEYS);result.highlightDefaults=sanitizeDefaultMap(input.highlightDefaults,["highlight"],HIGHLIGHT_FORMAT_KEYS);result.markupDefaults=sanitizeDefaultMap(input.markupDefaults,MARKUP_DEFAULT_TYPES,MARKUP_FORMAT_KEYS);result.measurementDefaults=sanitizeDefaultMap(input.measurementDefaults,MEASUREMENT_DEFAULT_TYPES,MEASUREMENT_FORMAT_KEYS);result.stickyNoteDefaults=sanitizeDefaultMap(input.stickyNoteDefaults,["sticky-note"],STICKY_NOTE_FORMAT_KEYS);
+  result.textDefaults=sanitizeDefaultMap(input.textDefaults,["insert"],TEXT_FORMAT_KEYS);result.highlightDefaults=sanitizeDefaultMap(input.highlightDefaults,["highlight"],HIGHLIGHT_FORMAT_KEYS);result.markupDefaults=sanitizeDefaultMap(input.markupDefaults,MARKUP_DEFAULT_TYPES,MARKUP_FORMAT_KEYS);result.measurementDefaults=sanitizeDefaultMap(input.measurementDefaults,MEASUREMENT_DEFAULT_TYPES,MEASUREMENT_FORMAT_KEYS);result.measurementScale=sanitizeMeasurementScalePreferences(input.measurementScale);result.stickyNoteDefaults=sanitizeDefaultMap(input.stickyNoteDefaults,["sticky-note"],STICKY_NOTE_FORMAT_KEYS);
   const view=input.interface;if(view&&typeof view==="object"&&!Array.isArray(view)){for(const[key,min,max]of[["sidebarSize",280,420],["inspectorSize",210,460],["markupsSize",120,520]]){const value=safeNumber(view[key],min,max);if(value!==null)result.interface[key]=value;}for(const key of ["inspectorCollapsed","markupsCollapsed","liveLegendHintShown"])if(typeof view[key]==="boolean")result.interface[key]=view[key];}
   return result;
 }

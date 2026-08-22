@@ -1,4 +1,4 @@
-import { canRotatePageItem, rotatedItemBounds } from "./rotation-core.js?v=1";
+import { canRotatePageItem, rotatedItemBounds } from "../shared/rotation-core.js?v=1";
 
 export function isFreeAreaHighlight(item) {
   return item?.type === "highlight" && !item.rects?.length;

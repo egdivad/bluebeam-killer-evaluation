@@ -1,11 +1,12 @@
 // Compatibility exports for existing tests and integrations.
 // New application code imports each focused module directly.
-export * from "./geometry-core.js";
-export * from "./measurement-core.js";
-export * from "./page-core.js";
-export * from "./page-rotation-core.js";
-export * from "./page-tools-core.js";
-export * from "./rotation-core.js";
-export * from "./shortcut-core.js";
-export * from "./sticky-note-core.js";
-export * from "./text-core.js";
+export * from "./shared/geometry-core.js";
+export * from "./measurements/measurement-core.js";
+export * from "./measurements/measurement-scale-core.js";
+export * from "./document/page-core.js";
+export * from "./document/page-rotation-core.js";
+export * from "./document/page-tools-core.js";
+export * from "./shared/rotation-core.js";
+export * from "./shared/shortcut-core.js";
+export * from "./annotations/sticky-note-core.js";
+export * from "./annotations/text-core.js";

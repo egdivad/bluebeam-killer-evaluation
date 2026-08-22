@@ -1,3 +1,5 @@
+import { normalizeMeasurementScale } from "../measurements/measurement-scale-core.js?v=1";
+
 export const RECOVERY_VERSION = 1;
 export const RECOVERY_KEY = "current";
 
@@ -65,7 +67,7 @@ export function createRecoveryRecord({ documentName, pageSources, document }, no
   const pages = cleanPages(document?.pages, sourceKeys);
   if (!pages.length) throw new Error("At least one page is required.");
   const pageIds = new Set(pages.map(page => page.id)), annotations = jsonClone(document?.annotations, []).filter(item => item && typeof item === "object" && pageIds.has(item.pageId)), measurementScales = {};
-  for (const [pageId, scale] of Object.entries(jsonClone(document?.measurementScales, {}))) if (pageIds.has(pageId) && scale && typeof scale === "object") measurementScales[pageId] = scale;
+  for (const [pageId, scale] of Object.entries(jsonClone(document?.measurementScales, {}))) { const safeScale=normalizeMeasurementScale(scale);if(pageIds.has(pageId)&&safeScale)measurementScales[pageId]=safeScale; }
   return {
     key: RECOVERY_KEY,
     version: RECOVERY_VERSION,

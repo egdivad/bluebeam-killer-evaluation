@@ -1,5 +1,5 @@
 import { displayBoundsToPdfRect, displayPointToPdf, displayRectToPdfRect, makePageGeometry } from "./page-rotation-core.js";
-import { canRotatePageItem, normalizeRotation } from "./rotation-core.js?v=1";
+import { canRotatePageItem, normalizeRotation } from "../shared/rotation-core.js?v=1";
 
 const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 const BLUEBEAM_KILLER_DATA_KEY="BKData",BLUEBEAM_KILLER_DATA_VERSION=1,MAX_STORED_ANNOTATION_BYTES=1_000_000;
@@ -134,7 +134,8 @@ function common(annotation, subtype, rect, color, width, opacity = 1) {
 function measureSpec(annotation) {
   const scale = annotation.measurementScale;
   if (!scale || !Number.isFinite(scale.unitsPerPoint) || scale.unitsPerPoint <= 0) return null;
-  return { ratio: `1 pt = ${scale.unitsPerPoint} ${scale.unit}`, unit: scale.unit || "pt", coordinateFactor: scale.unitsPerPoint, distanceFactor: 1, areaFactor: 1 };
+  const precision=Number.isFinite(Number(scale.precision))?Math.max(0,Math.min(6,Math.round(Number(scale.precision)))):2;
+  return { ratio: scale.ratio > 0 ? `1:${scale.ratio}` : `1 pt = ${scale.unitsPerPoint} ${scale.unit}`, unit: scale.unit || "pt", coordinateFactor: scale.unitsPerPoint, distanceFactor: 1, areaFactor: 1, precision };
 }
 
 function markupSpec(annotation, geometry) {
@@ -215,8 +216,8 @@ export function addPdfLibAnnotation(PDFLib, page, annotation, measurementLabel =
   const crop=page.getCropBox(),rotation=page.getRotation()?.angle||0,geometry=makePageGeometry({x:crop.x,y:crop.y,width:crop.width,height:crop.height,rotation}),spec = pdfAnnotationSpec(annotation, geometry, measurementLabel);if (!spec) return false;
   if(appearanceImage)spec.appearanceImage=appearanceImage;
   const context = page.doc.context, name = value => PDFLib.PDFName.of(value), text = value => PDFLib.PDFHexString.fromText(String(value ?? "")),pdfDateFor=value=>{const date=new Date(value||Date.now()),valid=Number.isNaN(date.getTime())?new Date():date,dateValue=valid.toISOString().replace(/[-:T]/g, "").replace(/\.\d{3}Z$/, "Z");return PDFLib.PDFString.of(`D:${dateValue}`);};
-  const pdfDate=pdfDateFor(spec.modifiedDate),numberFormat = (unit, factor) => context.obj({ Type: name("NumberFormat"), U: text(unit), C: PDFLib.PDFNumber.of(factor), D: PDFLib.PDFNumber.of(100), F: name("D"), SS: text("") });
-  const measureDictionary=measure=>context.obj({Type:name("Measure"),Subtype:name("RL"),R:text(measure.ratio),X:context.obj([numberFormat(measure.unit,measure.coordinateFactor)]),D:context.obj([numberFormat(measure.unit,measure.distanceFactor)]),A:context.obj([numberFormat(`${measure.unit}²`,measure.areaFactor)]),T:context.obj([numberFormat("°",1)]),TargetUnitConversion:PDFLib.PDFNumber.of(1)});
+  const pdfDate=pdfDateFor(spec.modifiedDate),numberFormat = (unit, factor, precision = 2) => context.obj({ Type: name("NumberFormat"), U: text(unit), C: PDFLib.PDFNumber.of(factor), D: PDFLib.PDFNumber.of(10 ** Math.max(0,Math.min(6,precision))), F: name("D"), SS: text("") });
+  const measureDictionary=measure=>context.obj({Type:name("Measure"),Subtype:name("RL"),R:text(measure.ratio),X:context.obj([numberFormat(measure.unit,measure.coordinateFactor,measure.precision)]),D:context.obj([numberFormat(measure.unit,measure.distanceFactor,measure.precision)]),A:context.obj([numberFormat(`${measure.unit}²`,measure.areaFactor,measure.precision)]),T:context.obj([numberFormat("°",1,1)]),TargetUnitConversion:PDFLib.PDFNumber.of(1)});
   const data = { Type: name("Annot"), Subtype: name(spec.subtype), Rect: context.obj(spec.rect), P: page.ref, F: PDFLib.PDFNumber.of(4), NM: PDFLib.PDFString.of(String(spec.id || crypto.randomUUID())), T: text(spec.title), Subj: text(spec.subject), Contents: text(spec.contents), CreationDate:pdfDateFor(spec.creationDate), M:pdfDate, CA: PDFLib.PDFNumber.of(spec.opacity ?? 1), [BLUEBEAM_KILLER_DATA_KEY]:text(bluebeamKillerAnnotationData(annotation)) };if(spec.color)data.C=context.obj(spec.color);
   const border = { Type: name("Border"), W: PDFLib.PDFNumber.of(spec.width || 0), S: name(spec.border?.style || "S") };if (spec.border?.dash?.length) border.D = context.obj(spec.border.dash);data.BS = context.obj(border);
   if (spec.interiorColor) data.IC = context.obj(spec.interiorColor);

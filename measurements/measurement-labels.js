@@ -1,18 +1,18 @@
-import { formatMeasurement, measurementAreaValue, measurementBounds, measurementPerimeterValue, measurementValue } from "./measurement-core.js";
+import { formatMeasurement, measurementAreaValue, measurementBounds, measurementPerimeterValue, measurementValue } from "./measurement-core.js?v=2";
 
 export function measurementLabelLines(annotation) {
   if (annotation.measureKind === "count") return [String(annotation.countValue || 1)];
-  const scale = annotation.measurementScale || { unitsPerPoint: 1, unit: "pt" };
+  const scale = annotation.measurementScale || { unitsPerPoint: 1, unit: "pt", precision: 2 };
   const value = measurementValue(annotation.measureKind, annotation.points, scale);
-  const formatted = formatMeasurement(annotation.measureKind, value, scale.unit);
+  const formatted = formatMeasurement(annotation.measureKind, value, scale.unit, scale.precision);
   const lines = [annotation.measureKind === "area" ? `A: ${formatted}` : annotation.measureKind === "diameter" ? `D: ${formatted}` : formatted];
   if (["area", "diameter"].includes(annotation.measureKind) && annotation.showPerimeterLength) {
     const perimeter = measurementPerimeterValue(annotation.measureKind, annotation.points, scale);
-    lines.push(`P: ${formatMeasurement("perimeter", perimeter, scale.unit)}`);
+    lines.push(`P: ${formatMeasurement("perimeter", perimeter, scale.unit, scale.precision)}`);
   }
   if (annotation.measureKind === "diameter" && annotation.showAreaValue) {
     const area = measurementAreaValue("diameter", annotation.points, scale);
-    lines.push(`A: ${formatMeasurement("area", area, scale.unit)}`);
+    lines.push(`A: ${formatMeasurement("area", area, scale.unit, scale.precision)}`);
   }
   return lines;
 }
