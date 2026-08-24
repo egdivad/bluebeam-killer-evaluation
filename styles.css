@@ -167,6 +167,7 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .edit-toolbar-row { overflow:hidden; }
 .tool-group { display:flex; height:100%; align-items:center; gap:3px; }
 .tool { display:flex; align-items:center; gap:7px; height:36px; border:0; border-radius:6px; background:transparent; padding:0 10px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.tool[aria-haspopup="menu"]::after { content:""; width:0; height:0; margin-left:1px; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid currentColor; opacity:.72; }
 .tool span { font-weight:700; font-size:15px; }
 .tool:hover { background:#f1f3f5; }
 .tool.active { color:var(--navy); background:#e7eff6; }
@@ -298,6 +299,14 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .measure-menu button strong { font-size:10px; }
 .measure-menu button small { margin-top:2px; overflow:hidden; color:var(--muted); font-size:8px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
 .measure-shortcut { min-width:0; max-width:54px; overflow:hidden; border:0; padding:0; background:transparent; color:var(--muted); font:500 7px "DM Sans",sans-serif; text-overflow:ellipsis; white-space:nowrap; }
+.select-tool-menu,.form-tool-menu { position:fixed; z-index:40; width:min(230px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; gap:4px; padding:8px; border:1px solid #cbd2d9; border-radius:9px; background:#fff; box-shadow:0 16px 42px rgba(20,31,43,.24); }
+.select-tool-menu:not([hidden]),.form-tool-menu:not([hidden]) { display:grid; }
+.select-tool-menu button,.form-tool-menu button { width:100%; min-width:0; min-height:44px; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:7px; padding:7px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--ink); text-align:left; cursor:pointer; }
+.select-tool-menu button:hover,.form-tool-menu button:hover,.form-tool-menu button.selected { border-color:#c9d6e0; background:#eef4f8; color:var(--navy); }
+.select-tool-menu button > span:last-of-type,.form-tool-menu button > span:last-of-type { display:flex; flex-direction:column; min-width:0; }
+.select-tool-menu button strong,.form-tool-menu button strong { font-size:10px; }
+.select-tool-menu button small,.form-tool-menu button small { margin-top:2px; overflow:hidden; color:var(--muted); font-size:8px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
+.select-tool-menu kbd { color:var(--muted); font-size:8px; }
 .markup-menu { position:fixed; z-index:40; width:min(330px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; grid-template-columns:1fr 1fr; gap:4px; padding:8px; border:1px solid #cbd2d9; border-radius:9px; background:#fff; box-shadow:0 16px 42px rgba(20,31,43,.24); }
 .markup-menu:not([hidden]) { display:grid; }
 .markup-menu-heading { grid-column:1 / -1; display:flex; justify-content:space-between; padding:4px 6px 8px; border-bottom:1px solid var(--line); }
@@ -414,7 +423,17 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .sticky-note-position { grid-template-columns:1fr 1fr; }
 .annotation[contenteditable="true"] { cursor:text; outline:1px dashed #2078b8; min-width:80px; min-height:1.35em; }
 .annotation-editor { font-family:Arial,Helvetica,sans-serif; resize:none; overflow:auto; border:2px solid #2078b8; outline:0; cursor:text; }
+.form-field-overlay { position:absolute; z-index:8; pointer-events:auto; box-sizing:border-box; border:1px solid rgba(21,110,170,.7); border-radius:3px; background:#fff; color:#142333; box-shadow:0 0 0 2px rgba(32,120,184,.12); font:500 12px "DM Sans",sans-serif; }
+.form-field-overlay:focus { outline:2px solid #2078b8; outline-offset:1px; background:#fff; }
+.form-field-readonly { pointer-events:none; border-color:transparent; background:#fff; box-shadow:none; }
+.form-field-overlay.selected { border-color:#2078b8; box-shadow:0 0 0 2px rgba(32,120,184,.22); }
+.form-field-checkbox,.form-field-radio { min-width:14px; min-height:14px; margin:0; accent-color:var(--navy); }
+.form-field-signature,.form-field-button { display:grid; place-items:center; overflow:hidden; padding:2px 5px; border-style:dashed; color:#526272; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
 .box-handle { position:absolute; z-index:6; pointer-events:auto; border:1px solid #fff; background:#2078b8; color:#fff; box-shadow:0 1px 4px rgba(20,30,40,.25); }
+.form-field-move-handle,.form-field-delete-handle { min-width:44px; height:20px; padding:0 6px; border-radius:4px 4px 0 0; font-size:9px; font-weight:700; }
+.form-field-move-handle { cursor:move; }
+.form-field-delete-handle { border-left-color:#d9e3ec; background:#b4232f; cursor:pointer; }
+.form-field-resize-handle { width:13px; height:13px; padding:0; border-radius:2px; cursor:nwse-resize; }
 .move-handle { min-width:48px; height:20px; padding:0 6px; border-radius:4px 4px 0 0; font-size:9px; font-weight:700; cursor:move; }
 .delete-handle { min-width:48px; height:20px; padding:0 6px; border-radius:4px 4px 0 0; border-left-color:#d9e3ec; background:#b4232f; font-size:9px; font-weight:700; cursor:pointer; }
 .resize-handle { width:13px; height:13px; padding:0; border-radius:2px; cursor:nwse-resize; }
@@ -851,11 +870,15 @@ html[data-theme="dark"] .settings-dialog { border-color:#3b4651; background:#1b2
 html[data-theme="dark"] .selection-filter-dialog { border-color:#3b4651; background:#1b2128; }
 html[data-theme="dark"] .recovery-dialog { border-color:#3b4651; background:#1b2128; }
 html[data-theme="dark"] .measure-menu,
+html[data-theme="dark"] .select-tool-menu,
+html[data-theme="dark"] .form-tool-menu,
 html[data-theme="dark"] .markup-menu,
 html[data-theme="dark"] .stamp-menu,
 html[data-theme="dark"] .scale-dialog,
 html[data-theme="dark"] .export-dialog { border-color:#3b4651; background:#1b2128; }
 html[data-theme="dark"] .measure-menu button:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
+html[data-theme="dark"] .select-tool-menu button:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
+html[data-theme="dark"] .form-tool-menu button:hover,html[data-theme="dark"] .form-tool-menu button.selected { border-color:#475866; background:#26313a; color:#8bc6ef; }
 html[data-theme="dark"] .markup-menu button:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
 html[data-theme="dark"] .stamp-preset,html[data-theme="dark"] .stamp-menu-actions button { border-color:#475866; background:#202931; color:#e8eef3; }
 html[data-theme="dark"] .stamp-preset:hover,html[data-theme="dark"] .stamp-menu-actions button:hover { border-color:#607487; background:#26313a; color:#8bc6ef; }

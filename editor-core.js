@@ -6,6 +6,7 @@ export * from "./measurements/measurement-scale-core.js";
 export * from "./document/page-core.js";
 export * from "./document/page-rotation-core.js";
 export * from "./document/page-tools-core.js";
+export * from "./document/form-core.js";
 export * from "./shared/rotation-core.js";
 export * from "./shared/shortcut-core.js";
 export * from "./annotations/sticky-note-core.js";

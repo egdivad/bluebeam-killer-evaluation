@@ -60,6 +60,31 @@ function cleanPages(values, sourceKeys) {
   return result;
 }
 
+function cleanFormWidgets(values) {
+  const result = [];
+  for (const value of values || []) {
+    const bounds = value?.bounds, pageId = String(value?.pageId || "").trim();
+    if (!pageId || !bounds) continue;
+    const x = Number(bounds.x), y = Number(bounds.y), w = Number(bounds.w), h = Number(bounds.h);
+    if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) continue;
+    result.push({ pageId, bounds: { x, y, w, h } });
+  }
+  return result;
+}
+
+function cleanFormFields(values) {
+  const result = [];
+  for (const value of values || []) {
+    const name = String(value?.name || "").trim();
+    if (!name) continue;
+    const id = String(value?.id || name).trim().slice(0, 120), type = String(value?.type || "unknown").trim().slice(0, 40), raw = value.value;
+    const field = { id, name: name.slice(0, 255), type, dirty: Boolean(value?.dirty), value: Array.isArray(raw) ? raw.map(item => String(item ?? "")).slice(0, 200) : typeof raw === "boolean" ? raw : String(raw ?? "").slice(0, 20_000) };
+    if (value?.manual) { field.manual = true;field.widgets = cleanFormWidgets(value.widgets); }
+    result.push(field);
+  }
+  return result;
+}
+
 export function createRecoveryRecord({ documentName, pageSources, document }, now = new Date()) {
   const sources = cleanSources(pageSources instanceof Map ? [...pageSources].map(([key, source]) => ({ key, name: source?.name, bytes: source?.bytes })) : pageSources);
   const sourceKeys = new Set(sources.map(source => source.key));
@@ -82,6 +107,7 @@ export function createRecoveryRecord({ documentName, pageSources, document }, no
       annotations,
       bookmarks: jsonClone(document?.bookmarks, []),
       layers: jsonClone(document?.layers, []),
+      formFields: cleanFormFields(document?.formFields),
       measurementScales,
     },
   };

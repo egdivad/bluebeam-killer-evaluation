@@ -28,5 +28,5 @@ export function shortcutCommand(event) {
   if (event.key === "+" || event.key === "=") return "zoom-in";
   if (event.key === "-") return "zoom-out";
   if (shift) return ({ e: "edit", f: "markup-flag", p: "markup-polygon", v: "lasso" })[key] || null;
-  return ({ v: "select", h: "highlight", t: "insert", c: "markup-cloud", a: "markup-arrow", r: "markup-rectangle", e: "markup-ellipse", l: "markup-line", q: "markup-callout", n: "markup-note" })[key] || null;
+  return ({ v: "select", f: "forms", h: "highlight", t: "insert", c: "markup-cloud", a: "markup-arrow", r: "markup-rectangle", e: "markup-ellipse", l: "markup-line", q: "markup-callout", n: "markup-note" })[key] || null;
 }
