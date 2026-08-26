@@ -9,7 +9,7 @@ export function formatPainterPatch(source,target){
   if(source.type==="sticky-note")return{color:source.color||"#f6c344",...patch};
   if(source.type==="highlight")return{highlightColor:source.highlightColor||"#ffd84d",...patch};
   if(source.type==="measurement"&&(source.measureKind==="calibration"||target.measureKind==="calibration"))return null;
-  const keys=textTypes.has(source.type)?["fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit","rotation"]:source.type==="markup"?MARKUP_FORMAT_KEYS:MEASUREMENT_FORMAT_KEYS;
+  const keys=textTypes.has(source.type)?["fontFamily","fontChoice","fontSize","lineHeight","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit","rotation"]:source.type==="markup"?MARKUP_FORMAT_KEYS:MEASUREMENT_FORMAT_KEYS;
   for(const key of keys)if(Object.hasOwn(source,key))patch[key]=structuredClone(source[key]);
   return patch;
 }

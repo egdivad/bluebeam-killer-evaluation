@@ -1,6 +1,40 @@
 <!doctype html>
 <html lang="en">
+  <!--
+    MAINTAINER GUIDE: HOW THIS FILE CONNECTS TO THE APPLICATION
+
+    This document is the editor's permanent DOM skeleton. app.js does not use a
+    component framework; it looks up many elements directly by `id`, attaches
+    event handlers, and changes their text, attributes, classes, or children.
+    Treat an existing ID as a public interface between this file, app.js, CSS,
+    and the browser tests. If an ID must change, search the entire repository
+    and update every reference in the same change.
+
+    Repeated controls use `data-*` attributes as lightweight configuration:
+    `data-tool` activates editor modes, palette-specific attributes identify a
+    menu choice, and `data-toolbar-overflow` gives movable toolbar items their
+    overflow priority. JavaScript relies on those values, so they are not merely
+    descriptive HTML. A larger overflow number stays visible longer.
+
+    `hidden` is the initial state for panels, menus, and conditional property
+    groups. JavaScript removes it only when the current document or selection
+    makes that UI relevant. Prefer a real button, input, dialog, menu role, and
+    ARIA relationship over a clickable generic element; this keeps keyboard and
+    screen-reader behavior working without recreating browser semantics.
+
+    When adding a control, normally update four places together:
+      1. its markup and accessible name in this file;
+      2. its styling, including dark and narrow layouts, in styles.css;
+      3. its event/state behavior and keyboard dispatch in app.js; and
+      4. the relevant unit or browser test. Add the shortcut to the visible
+         shortcut guide too when the new control has a keyboard command.
+  -->
   <head>
+    <!--
+      The head contains document metadata, fonts, styles, and third-party PDF
+      support. It intentionally contains no editor behavior: app.js is loaded
+      at the end of <body> after every element it needs has been created.
+    -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
@@ -17,11 +51,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
+    <!--
+      Apply the saved theme before the stylesheet paints. This tiny early script
+      prevents a light-theme flash for people who prefer dark mode. app.js later
+      validates and manages the same preference in more detail.
+    -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=1c23cce21ece" />
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=01a62d814802" />
+    <script src="vendor/pdf-lib.min.js"></script>
   </head>
   <body>
+    <!--
+      APPLICATION HEADER
+
+      This stays visible while the document scrolls. `fileName` and `saveState`
+      are live status targets updated by app.js. The file input is hidden because
+      styled buttons trigger it; keeping the native input preserves browser file
+      selection and accessibility behavior.
+    -->
     <header class="topbar">
       <div class="brand"><span class="brand-mark">BK</span><span class="brand-name"><span class="brand-title">Bluebeam Killer</span><span class="build-badges"><small class="wip-badge" title="Beta build">Beta</small></span></span></div>
       <div class="document-title">
@@ -37,30 +84,38 @@
       </div>
     </header>
 
+    <!--
+      FLOATING TOOL PALETTES
+
+      These menus are outside the toolbar so they can float over the document.
+      The `hidden` attribute is the initial closed state; app.js positions and
+      opens one palette at a time. Each `data-*-tool` value is the stable link
+      between a menu choice and the tool logic in app.js.
+    -->
     <div class="measure-menu" id="measureMenu" hidden>
       <div class="measure-menu-heading"><strong>Measure</strong><span id="measureScaleStatus">Scale not set</span></div>
       <button data-measure-tool="calibrate"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><span><strong>Set scale</strong><small>Calibrate from two points</small></span></button>
       <button id="scalePresetButton" type="button"><span class="ui-icon icon-ruler" aria-hidden="true"></span><span><strong>Scale presets</strong><small>Apply scale, unit, and precision</small></span></button>
-      <button data-measure-tool="length" aria-keyshortcuts="Alt+Shift+L"><span class="ui-icon icon-ruler" aria-hidden="true"></span><span><strong>Length</strong><small>Two points</small></span><kbd class="measure-shortcut">Shift+Alt+L</kbd></button>
-      <button data-measure-tool="polyline" aria-keyshortcuts="Alt+Shift+Q"><span class="ui-icon icon-route" aria-hidden="true"></span><span><strong>Polyline</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+Q</kbd></button>
-      <button data-measure-tool="area" aria-keyshortcuts="Alt+Shift+A"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Area</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+A</kbd></button>
-      <button data-measure-tool="perimeter" aria-keyshortcuts="Alt+Shift+P"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Perimeter</strong><small>Double-click to finish</small></span><kbd class="measure-shortcut">Shift+Alt+P</kbd></button>
-      <button data-measure-tool="diameter" aria-keyshortcuts="Alt+Shift+D"><span class="ui-icon icon-circle" aria-hidden="true"></span><span><strong>Diameter</strong><small>Two points across circle</small></span><kbd class="measure-shortcut">Shift+Alt+D</kbd></button>
-      <button data-measure-tool="angle" aria-keyshortcuts="Alt+Shift+G"><span class="ui-icon icon-angle" aria-hidden="true"></span><span><strong>Angle</strong><small>Arm, vertex, arm</small></span><kbd class="measure-shortcut">Shift+Alt+G</kbd></button>
-      <button data-measure-tool="count" aria-keyshortcuts="Alt+Shift+C"><span class="ui-icon icon-hash" aria-hidden="true"></span><span><strong>Count</strong><small>Click each item</small></span><kbd class="measure-shortcut">Shift+Alt+C</kbd></button>
+      <button data-measure-tool="length" aria-keyshortcuts="Alt+Shift+L"><span class="ui-icon icon-ruler" aria-hidden="true"></span><span><strong>Length</strong><small>Two points</small></span><kbd class="tool-shortcut">Shift+Alt+L</kbd></button>
+      <button data-measure-tool="polyline" aria-keyshortcuts="Alt+Shift+Q"><span class="ui-icon icon-route" aria-hidden="true"></span><span><strong>Polyline</strong><small>Double-click to finish</small></span><kbd class="tool-shortcut">Shift+Alt+Q</kbd></button>
+      <button data-measure-tool="area" aria-keyshortcuts="Alt+Shift+A"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Area</strong><small>Double-click to finish</small></span><kbd class="tool-shortcut">Shift+Alt+A</kbd></button>
+      <button data-measure-tool="perimeter" aria-keyshortcuts="Alt+Shift+P"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Perimeter</strong><small>Double-click to finish</small></span><kbd class="tool-shortcut">Shift+Alt+P</kbd></button>
+      <button data-measure-tool="diameter" aria-keyshortcuts="Alt+Shift+D"><span class="ui-icon icon-circle" aria-hidden="true"></span><span><strong>Diameter</strong><small>Two points across circle</small></span><kbd class="tool-shortcut">Shift+Alt+D</kbd></button>
+      <button data-measure-tool="angle" aria-keyshortcuts="Alt+Shift+G"><span class="ui-icon icon-angle" aria-hidden="true"></span><span><strong>Angle</strong><small>Arm, vertex, arm</small></span><kbd class="tool-shortcut">Shift+Alt+G</kbd></button>
+      <button data-measure-tool="count" aria-keyshortcuts="Alt+Shift+C"><span class="ui-icon icon-hash" aria-hidden="true"></span><span><strong>Count</strong><small>Click each item</small></span><kbd class="tool-shortcut">Shift+Alt+C</kbd></button>
     </div>
 
     <div class="markup-menu" id="markupMenu" hidden>
       <div class="markup-menu-heading"><strong>Markup</strong><span>Local review tools</span></div>
-      <button data-markup-tool="line" aria-keyshortcuts="L"><span class="ui-icon icon-line" aria-hidden="true"></span><span><strong>Line</strong><small>Drag between two points</small></span><kbd class="measure-shortcut">L</kbd></button>
-      <button data-markup-tool="arrow" aria-keyshortcuts="A"><span class="ui-icon icon-arrow-right" aria-hidden="true"></span><span><strong>Arrow</strong><small>Drag to point at an item</small></span><kbd class="measure-shortcut">A</kbd></button>
-      <button data-markup-tool="rectangle" aria-keyshortcuts="R"><span class="ui-icon icon-square" aria-hidden="true"></span><span><strong>Rectangle</strong><small>Drag around an item</small></span><kbd class="measure-shortcut">R</kbd></button>
-      <button data-markup-tool="ellipse" aria-keyshortcuts="E"><span class="ui-icon icon-circle" aria-hidden="true"></span><span><strong>Ellipse</strong><small>Drag around an item</small></span><kbd class="measure-shortcut">E</kbd></button>
-      <button data-markup-tool="cloud" aria-keyshortcuts="C"><span class="ui-icon icon-cloud" aria-hidden="true"></span><span><strong>Cloud</strong><small>Drag a revision cloud</small></span><kbd class="measure-shortcut">C</kbd></button>
-      <button data-markup-tool="polygon" aria-keyshortcuts="Shift+P"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Polygon</strong><small>Click points. Double-click to finish.</small></span><kbd class="measure-shortcut">Shift+P</kbd></button>
-      <button data-markup-tool="callout" aria-keyshortcuts="Q"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Callout</strong><small>Drag from the arrow head</small></span><kbd class="measure-shortcut">Q</kbd></button>
-      <button data-markup-tool="flag" aria-keyshortcuts="Shift+F"><span class="ui-icon icon-flag" aria-hidden="true"></span><span><strong>Flag</strong><small>Click to place a text flag</small></span><kbd class="measure-shortcut">Shift+F</kbd></button>
-      <button data-markup-tool="note" aria-keyshortcuts="N"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Sticky Note</strong><small>Click to place and add a note</small></span><kbd class="measure-shortcut">N</kbd></button>
+      <button data-markup-tool="line" aria-keyshortcuts="L"><span class="ui-icon icon-line" aria-hidden="true"></span><span><strong>Line</strong><small>Drag between two points</small></span><kbd class="tool-shortcut">L</kbd></button>
+      <button data-markup-tool="arrow" aria-keyshortcuts="A"><span class="ui-icon icon-arrow-right" aria-hidden="true"></span><span><strong>Arrow</strong><small>Drag to point at an item</small></span><kbd class="tool-shortcut">A</kbd></button>
+      <button data-markup-tool="rectangle" aria-keyshortcuts="R"><span class="ui-icon icon-square" aria-hidden="true"></span><span><strong>Rectangle</strong><small>Drag around an item</small></span><kbd class="tool-shortcut">R</kbd></button>
+      <button data-markup-tool="ellipse" aria-keyshortcuts="E"><span class="ui-icon icon-circle" aria-hidden="true"></span><span><strong>Ellipse</strong><small>Drag around an item</small></span><kbd class="tool-shortcut">E</kbd></button>
+      <button data-markup-tool="cloud" aria-keyshortcuts="C"><span class="ui-icon icon-cloud" aria-hidden="true"></span><span><strong>Cloud</strong><small>Drag a revision cloud</small></span><kbd class="tool-shortcut">C</kbd></button>
+      <button data-markup-tool="polygon" aria-keyshortcuts="Shift+P"><span class="ui-icon icon-pentagon" aria-hidden="true"></span><span><strong>Polygon</strong><small>Click points. Double-click to finish.</small></span><kbd class="tool-shortcut">Shift+P</kbd></button>
+      <button data-markup-tool="callout" aria-keyshortcuts="Q"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Callout</strong><small>Drag from the arrow head</small></span><kbd class="tool-shortcut">Q</kbd></button>
+      <button data-markup-tool="flag" aria-keyshortcuts="Shift+F"><span class="ui-icon icon-flag" aria-hidden="true"></span><span><strong>Flag</strong><small>Click to place a text flag</small></span><kbd class="tool-shortcut">Shift+F</kbd></button>
+      <button data-markup-tool="note" aria-keyshortcuts="N"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Sticky Note</strong><small>Click to place and add a note</small></span><kbd class="tool-shortcut">N</kbd></button>
       <button data-markup-tool="freehand"><span class="ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Freehand</strong><small>Draw with the pointer</small></span></button>
     </div>
 
@@ -74,9 +129,21 @@
       <input id="stampImageFileInput" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden />
     </div>
 
+    <!--
+      MAIN WORKSPACE
+
+      The three direct children are the left document sidebar, center editor,
+      and right properties inspector. CSS Grid controls their desktop layout;
+      media queries later turn panels into overlays on smaller screens.
+    -->
     <main class="workspace">
       <aside class="sidebar" id="sidebar">
         <div class="panel-resizer panel-resizer-right" id="sidebarResizer" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0"></div>
+        <!--
+          This is a real ARIA tab interface. Each tab's `aria-controls` points
+          to one panel below. app.js updates `aria-selected`, `hidden`, and the
+          `.active` class together whenever a person changes panels.
+        -->
         <div class="sidebar-tabs" role="tablist" aria-label="Document panels">
           <button class="active" id="pagesTab" type="button" role="tab" aria-selected="true" aria-controls="pagesPanel" data-sidebar-tab="pages" title="Pages"><span class="ui-icon icon-file" aria-hidden="true"></span><span>Pages</span></button>
           <button id="searchTab" type="button" role="tab" aria-selected="false" aria-controls="searchPanel" data-sidebar-tab="search" title="Search document" aria-keyshortcuts="Control+F"><span class="ui-icon icon-search" aria-hidden="true"></span><span>Search</span></button>
@@ -147,19 +214,76 @@
         </section>
       </aside>
 
+      <!--
+        CENTER EDITOR
+
+        The editor contains a toolbar, the document canvas area, an optional
+        Markups List, and a status bar. Tool controls use IDs because app.js
+        attaches event handlers directly to them and updates their state.
+      -->
       <section class="editor">
         <nav class="toolbar" aria-label="PDF editing tools">
           <div class="edit-toolbar-row">
             <div class="tool-group toolbar-primary">
-            <button class="tool active" id="selectButton" data-tool="select" title="Select added items (V). Hover for Lasso (Shift+V)." aria-keyshortcuts="V Shift+V" aria-haspopup="menu" aria-controls="selectToolMenu" aria-expanded="false"><span class="ui-icon icon-pointer" aria-hidden="true"></span>Select</button>
+            <!--
+              SELECT / LASSO SPLIT BUTTON
+
+              This <div> is the visible outer frame around two real buttons.
+              The first button is the normal, one-click action: it activates
+              whichever selection mode is currently shown (Select or Lasso).
+              The second button is only the down-arrow; it opens a menu so a
+              person can choose the other selection mode.
+
+              Do not replace this with one button. Two buttons let keyboard and
+              screen-reader users reach the immediate action and the menu as
+              separate, correctly described controls. `aria-haspopup`,
+              `aria-controls`, and `aria-expanded` tell assistive technology
+              that the arrow opens `selectToolMenu` and whether it is open.
+
+              app.js updates `selectButtonIcon` and `selectButtonLabel` when
+              the active mode changes. The IDs and the outer
+              `dynamic-select-tool` class must therefore remain in place: the
+              class reserves a fixed width so a longer label cannot move every
+              neighbouring tool in the toolbar.
+            -->
+            <div class="split-tool dynamic-select-tool" id="selectToolControl">
+              <button class="tool active" id="selectButton" data-tool="select" title="Activate Select (V)" aria-keyshortcuts="V" aria-pressed="true"><span class="ui-icon icon-pointer" id="selectButtonIcon" aria-hidden="true"></span><span class="tool-label" id="selectButtonLabel">Select</span></button>
+              <button class="split-tool-toggle" id="selectMenuButton" type="button" title="Choose Select or Lasso" aria-label="Choose a selection tool" aria-haspopup="menu" aria-controls="selectToolMenu" aria-expanded="false"><span class="split-tool-chevron" aria-hidden="true"></span></button>
+            </div>
             <button class="tool" id="selectionFilterButton" data-toolbar-overflow="124" data-overflow-label="Select by" title="Select by properties (Ctrl+Shift+F)" aria-keyshortcuts="Control+Shift+F" disabled><span class="ui-icon icon-list-filter" aria-hidden="true"></span>Select by</button>
             <button class="tool" data-tool="highlight" title="Highlight text (H)"><span class="ui-icon icon-highlighter" aria-hidden="true"></span>Highlight</button>
             <button class="tool" data-tool="insert" data-toolbar-overflow="120" data-overflow-label="Insert text" title="Insert text (T)"><span class="ui-icon icon-type" aria-hidden="true"></span>Insert text</button>
             <button class="tool" data-tool="edit" data-toolbar-overflow="110" data-overflow-label="Edit text" title="Edit existing text (Shift+E)" aria-keyshortcuts="Shift+E"><span class="ui-icon icon-text-cursor" aria-hidden="true"></span>Edit text</button>
-            <button class="tool" id="formsButton" data-tool="forms" data-toolbar-overflow="112" data-overflow-label="Fill forms" title="Open a PDF before filling forms." aria-keyshortcuts="F" aria-haspopup="menu" aria-controls="formToolMenu" aria-expanded="false" disabled><span class="ui-icon icon-file" aria-hidden="true"></span>Fill forms</button>
-            <button class="tool" data-tool="markup" id="markupButton" title="Drawing markups"><span class="ui-icon icon-shapes" aria-hidden="true"></span>Markup</button>
-            <button class="tool" data-tool="measure" id="measureButton" title="Measure drawing"><span class="ui-icon icon-ruler" aria-hidden="true"></span>Measure</button>
-            <button class="tool" data-tool="stamp" id="stampButton" data-toolbar-overflow="105" data-overflow-label="Stamp" title="Place a standard or custom stamp"><span class="ui-icon icon-stamp" aria-hidden="true"></span>Stamp</button>
+            <!--
+              FORM SPLIT BUTTON
+
+              Form uses the same pattern as Select: the left button is the
+              direct action and the arrow is the menu opener. It starts disabled
+              because a PDF must be open before form tools are useful. Keep both
+              buttons disabled together so the one outer frame never appears to
+              have one available half and one unavailable half.
+            -->
+            <div class="split-tool" id="formToolControl" data-toolbar-overflow="112" data-overflow-label="Form">
+              <button class="tool" id="formsButton" data-tool="forms" title="Open a PDF before using Form mode." aria-keyshortcuts="F" disabled><span class="ui-icon icon-file" aria-hidden="true"></span><span class="tool-label">Form</span></button>
+              <button class="split-tool-toggle" id="formMenuButton" type="button" title="Choose a manual form field tool" aria-label="Choose a manual form field tool" aria-haspopup="menu" aria-controls="formToolMenu" aria-expanded="false" disabled><span class="split-tool-chevron" aria-hidden="true"></span></button>
+            </div>
+            <!--
+              DYNAMIC MARKUP / MEASURE BUTTONS
+
+              These are menu buttons, not split buttons. Clicking either one
+              opens its palette. After a user selects a markup or measurement,
+              app.js temporarily changes the icon and text to show the active
+              tool. When the user leaves that mode, app.js restores the default
+              "Markup" or "Measure" label and icon.
+
+              `dynamic-mode-tool` gives each button a fixed width. This is
+              important because names such as "Sticky Note" are longer than
+              "Markup"; without the fixed width the toolbar would visibly jump
+              whenever the active tool changed.
+            -->
+            <button class="tool dynamic-mode-tool" data-tool="markup" id="markupButton" title="Open drawing markup tools" aria-haspopup="menu" aria-controls="markupMenu" aria-expanded="false"><span class="ui-icon icon-shapes" id="markupButtonIcon" aria-hidden="true"></span><span class="tool-label" id="markupButtonLabel">Markup</span></button>
+            <button class="tool dynamic-mode-tool" data-tool="measure" id="measureButton" title="Open drawing measurement tools" aria-haspopup="menu" aria-controls="measureMenu" aria-expanded="false"><span class="ui-icon icon-ruler" id="measureButtonIcon" aria-hidden="true"></span><span class="tool-label" id="measureButtonLabel">Measure</span></button>
+            <button class="tool" data-tool="stamp" id="stampButton" data-toolbar-overflow="105" data-overflow-label="Stamp" title="Open standard and custom stamp tools" aria-haspopup="menu" aria-controls="stampMenu" aria-expanded="false"><span class="ui-icon icon-stamp" aria-hidden="true"></span>Stamp</button>
             <button class="snap-toggle toolbar-snap" id="snapToContentButton" type="button" data-toolbar-overflow="100" data-overflow-label="Snap" aria-pressed="false" aria-label="Snap measurements to PDF vector content" title="Snap measurements to PDF vector content" disabled><span class="ui-icon icon-magnet" aria-hidden="true"></span><span class="snap-label">Snap</span></button>
             </div>
             <div class="highlight-palette" id="highlightPalette" data-toolbar-overflow="90" aria-label="Highlight color" hidden><span>Color</span><button style="--highlight:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--highlight:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--highlight:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--highlight:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--highlight:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--highlight:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button><input id="highlightToolCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom highlight color" /></div>
@@ -175,6 +299,14 @@
             <button class="icon-button keyboard-button" id="keyboardShortcutsButton" data-toolbar-overflow="10" data-overflow-label="Keyboard shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><span class="ui-icon icon-keyboard" aria-hidden="true"></span></button>
             </div>
             <div class="toolbar-spacer"></div>
+            <!--
+              JavaScript temporarily moves elements carrying
+              `data-toolbar-overflow` into the menu below when the editor column
+              becomes too narrow. The spacer consumes only leftover room; the
+              overflow button and zoom controls remain anchored at the right.
+              Do not duplicate overflow candidates in this menu—the same DOM
+              nodes are moved here and later restored to their placeholders.
+            -->
             <button class="icon-button toolbar-overflow-button" id="toolbarOverflowButton" type="button" aria-label="More editing tools" aria-haspopup="menu" aria-expanded="false" title="More editing tools" hidden><span class="ui-icon icon-ellipsis" aria-hidden="true"></span></button>
             <div class="toolbar-overflow-menu" id="toolbarOverflowMenu" role="menu" aria-label="More editing tools" hidden></div>
             <div class="zoom-controls">
@@ -182,7 +314,8 @@
             </div>
           </div>
           <div class="select-tool-menu" id="selectToolMenu" role="menu" aria-label="Select tool options" hidden>
-            <button class="tool" data-tool="lasso" type="button" role="menuitem" title="Lasso select added items (Shift+V)" aria-keyshortcuts="Shift+V"><span class="ui-icon icon-lasso" aria-hidden="true"></span><span><strong>Lasso</strong><small>Draw around added items</small></span><kbd>Shift+V</kbd></button>
+            <button data-selection-tool="select" type="button" role="menuitemradio" title="Select added items (V)" aria-keyshortcuts="V" aria-checked="true"><span class="ui-icon icon-pointer" aria-hidden="true"></span><span><strong>Select</strong><small>Select and move added items</small></span><kbd class="tool-shortcut">V</kbd><span class="select-tool-check" aria-hidden="true">&#10003;</span></button>
+            <button data-selection-tool="lasso" type="button" role="menuitemradio" title="Lasso select added items (Shift+V)" aria-keyshortcuts="Shift+V" aria-checked="false"><span class="ui-icon icon-lasso" aria-hidden="true"></span><span><strong>Lasso</strong><small>Draw around added items</small></span><kbd class="tool-shortcut">Shift+V</kbd><span class="select-tool-check" aria-hidden="true">&#10003;</span></button>
           </div>
           <div class="form-tool-menu" id="formToolMenu" role="menu" aria-label="Manual form field type" hidden>
             <button type="button" role="menuitem" data-manual-form-type="text"><span class="ui-icon icon-type" aria-hidden="true"></span><span><strong>Text field</strong><small>Double-click page to place</small></span></button>
@@ -190,6 +323,15 @@
           </div>
         </nav>
 
+        <!--
+          DOCUMENT RENDERING LAYERS
+
+          `pdfCanvas` is the original PDF page image. The three absolutely
+          stacked divs above it serve different jobs: textLayer keeps PDF text
+          selectable, annotationLayer contains editable objects, and drawLayer
+          holds temporary drafts, selection outlines, and search highlights.
+          Do not swap their order: pointer and selection behavior relies on it.
+        -->
         <div class="canvas-area" id="canvasArea">
           <div class="empty-state" id="emptyState">
             <div class="empty-badge">PDF</div>
@@ -209,6 +351,7 @@
           <div class="cursor-tool-hint" id="cursorToolHint" role="status" aria-live="polite" hidden></div>
         </div>
 
+        <!-- The Markups List is optional so it does not reduce page space until opened. -->
         <section class="markups-panel" id="markupsPanel" aria-label="Markups List" hidden>
           <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize or collapse Markups List" aria-orientation="horizontal" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
           <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="layer">Layer</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
@@ -231,6 +374,13 @@
         </footer>
       </section>
 
+      <!--
+        PROPERTIES INSPECTOR
+
+        app.js reveals one of three states: an empty explanation, properties for
+        a single selected item, or batch properties for multiple selected items.
+        Many groups start hidden because they only apply to certain item types.
+      -->
       <aside class="inspector" id="inspector">
         <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize or collapse properties panel" aria-orientation="vertical" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
         <div class="inspector-empty" id="inspectorEmpty"><span class="ui-icon icon-file" aria-hidden="true"></span><strong>No item selected</strong><p>Select an annotation to change its style.</p></div>
@@ -331,6 +481,7 @@
           <label>Text<textarea id="textValue" rows="4" spellcheck="true"></textarea></label>
           <label>Font<select id="fontFamily"><option value="original">Original font</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
           <label>Font size<div class="field-row"><input id="fontSize" type="range" min="8" max="48" value="16" /><output id="fontSizeValue">16 pt</output></div></label>
+          <label id="lineHeightField">Line spacing<div class="field-row"><input id="lineHeight" type="range" min="1" max="2.5" step="0.05" value="1.25" /><output id="lineHeightValue">1.25×</output></div></label>
           <label class="toggle-row"><span><strong>Auto-fit text box</strong><small>Match the box to the typed text.</small></span><input id="autoFitTextBox" type="checkbox" role="switch" /></label>
           <label>Text style<div class="text-style-options" id="textStyleControls" role="group" aria-label="Text style"><button type="button" data-text-style="bold" aria-pressed="false"><strong>B</strong><span>Bold</span></button><button type="button" data-text-style="italic" aria-pressed="false"><em>I</em><span>Italic</span></button><button type="button" data-text-style="underline" aria-pressed="false"><span class="underline-letter">U</span><span>Underline</span></button></div></label>
           <label>Horizontal alignment<div class="alignment-options" id="horizontalAlign" role="group" aria-label="Horizontal text alignment"><button data-align="left" class="selected"><span class="text-align-icon icon-text-left" aria-hidden="true"></span><span>Left</span></button><button data-align="center"><span class="text-align-icon icon-text-center" aria-hidden="true"></span><span>Center</span></button><button data-align="right"><span class="text-align-icon icon-text-right" aria-hidden="true"></span><span>Right</span></button></div></label>
@@ -439,6 +590,13 @@
         </div>
       </aside>
     </main>
+    <!--
+      DIALOGS
+
+      Native <dialog> elements provide focus trapping and a backdrop. app.js
+      calls `showModal()` / `close()` rather than imitating a modal with plain
+      divs. Keep each dialog title ID aligned with `aria-labelledby`.
+    -->
     <dialog class="selection-filter-dialog" id="selectionFilterDialog" aria-labelledby="selectionFilterTitle">
       <div class="selection-filter-heading"><div><span>Advanced selection</span><h2 id="selectionFilterTitle">Select by properties</h2></div><button id="closeSelectionFilter" type="button" aria-label="Close selection filters"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <p>Choose one page and combine the filters. Hidden items are ignored. Locked items can be selected.</p>
@@ -456,7 +614,7 @@
     <dialog class="shortcut-dialog" id="shortcutDialog" aria-labelledby="shortcutTitle">
       <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <div class="shortcut-sections">
-        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd>, hover for Lasso</dd></div><div><dt>Lasso selection</dt><dd><kbd>Shift+V</kbd></dd></div><div><dt>Select by properties</dt><dd><kbd>Ctrl+Shift+F</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div><div><dt>Fill forms</dt><dd><kbd>F</kbd>, hover/long-press for manual field types</dd></div></dl></section>
+        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd>, choose Select or Lasso from the split menu</dd></div><div><dt>Lasso selection</dt><dd><kbd>Shift+V</kbd></dd></div><div><dt>Select by properties</dt><dd><kbd>Ctrl+Shift+F</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div><div><dt>Form mode</dt><dd><kbd>F</kbd>, choose manual field tools from the split menu</dd></div></dl></section>
         <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Search document</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
         <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
         <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Sticky Note</dt><dd><kbd>N</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
@@ -509,6 +667,12 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=1c23cce21ece"></script>
+    <!--
+      Load the module last so every element above exists before app.js performs
+      its initial ID lookups and event binding. The query-string version is a
+      cache key, not a separate file; increase it when runtime JavaScript changes
+      need to bypass a previously cached copy in deployed/offline testing.
+    -->
+    <script type="module" src="app.js?v=01a62d814802"></script>
   </body>
 </html>

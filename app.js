@@ -1,4 +1,15 @@
-import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+/*
+  DEPENDENCY BOUNDARY FOR NEW MAINTAINERS
+
+  Imports below are deliberately split into small, mostly pure modules. Put
+  reusable geometry, sanitising, storage, and PDF-format calculations in those
+  modules so they can be tested without a browser. Keep DOM querying, event
+  handling, render orchestration, and user feedback in this file. The `?v=`
+  suffixes are browser cache keys; when changing an imported module's runtime
+  behavior, bump its suffix here so deployed clients do not combine new app.js
+  code with a stale dependency.
+*/
+import * as pdfjsLib from "./vendor/pdf.min.mjs";
 import { loadStampPresets, loadToolChest, loadUserPreferences, saveStampPresets as persistStampPresets, saveToolChest as persistToolChest, saveUserPreferences as persistUserPreferences } from "./state/browser-storage.js?v=2";
 import { alignElementToPage, calculateAnchoredScroll, calculateFitScale, calculatePanScroll, constrainMoveDelta, constrainPointToAxis, extractVectorSegments, pointDistance, removeControlPoint, snapPointToSegments } from "./shared/geometry-core.js?v=1";
 import { calibrateDrawingScale, measurementBounds, measurementFillBoundary, measurementHatchSegments, measurementLineDash } from "./measurements/measurement-core.js?v=2";
@@ -29,17 +40,80 @@ import { applyNativePdfFormValues, detectNativePdfFormFields, formFieldSummary, 
 import { MAX_STAMP_IMAGE_BYTES, STANDARD_STAMP_PRESETS, captureStampPreset, defaultStampPoints, isSafeStampImageDataUrl, makeImageStampPreset, makeTextStampPreset, sanitizeStampPreset, stampPresetProperties } from "./annotations/stamp-core.js?v=2";
 import { canRotatePageItem, inverseRotatePoint, normalizeRotation, pointerRotation, rotatePoint, rotatedBoxFromWorldCorners, rotationCenter, rotationHandlePoint, rotationPageCorrection } from "./shared/rotation-core.js?v=1";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+/*
+  APPLICATION MAP FOR NEW CONTRIBUTORS
 
+  This file is the browser-side coordinator for the PDF editor. Small modules
+  in `document/`, `annotations/`, `measurements/`, `selection/`, and `state/`
+  contain reusable calculations. This file connects those calculations to the
+  HTML controls, keeps the in-memory document state, and redraws the screen.
+
+  A useful reading order is: shared state below → `loadPdf()` → `renderPage()`
+  → tool/selection handlers → export helpers at the end of the file. Most
+  changes should call `markChanged()` after changing persistent document data;
+  that updates dependent views and schedules local recovery.
+
+  IMPORTANT DATA FLOW
+
+  User event -> validate current mode/selection -> `snapshot()` before a
+  document mutation -> update `state` -> redraw the affected view -> call
+  `markChanged()`. Rendering is asynchronous, so page and thumbnail functions
+  use generation tokens or cancelable PDF.js tasks to stop an old render from
+  overwriting a newer page/zoom request.
+
+  There are three coordinate spaces to keep distinct:
+  - PDF coordinates use a bottom-left origin and PDF page units;
+  - display/page-item coordinates use a top-left origin before screen zoom;
+  - pointer coordinates are browser client pixels.
+  Use the existing geometry conversion helpers instead of mixing these spaces
+  directly. Rotated and cropped pages are the quickest way to expose mistakes.
+*/
+
+// PDF.js renders source PDF pages in a worker so large pages do not freeze the UI.
+pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.mjs";
+
+// Short DOM lookup helper. `$(`"saveButton"`)` means `document.getElementById(...)`.
 const $ = (id) => document.getElementById(id);
+
+/*
+  `state` is temporary data for the PDF currently open in this browser tab.
+  It is not the saved-preferences object: preferences are loaded separately
+  because they must survive closing a document. Page numbers are one-based for
+  the UI, while arrays elsewhere in JavaScript are usually zero-based.
+*/
 let userPreferences=loadUserPreferences();
 function saveUserPreferences(){persistUserPreferences(userPreferences);}
 function saveToolChest(){persistToolChest(toolChest);}
 function saveStampPresets(){return persistStampPresets(stampPresets);}
+/*
+  State field groups, despite the compact object literal below:
+  - `pdf`, `bytes`, and `pageSources` retain original/inserted PDF data;
+  - `pages` is the editable display order and `page` is one-based for the UI;
+  - `annotations`, `bookmarks`, `layers`, `formFields`, and scales are document
+    data that recovery/export must preserve;
+  - `selectedId` is the single-selection shortcut, while `selectedIds` supports
+    grouped/batch editing;
+  - history/future contain annotation snapshots for undo and redo;
+  - render tokens invalidate asynchronous work after navigation or layout change.
+*/
 const state = { pdf: null, bytes: null, pageSources: new Map(), pages: [], page: 1, selectedPageIds: [], scale: 1, layoutMode: userPreferences.pageLayout, tool: "select", highlightColor: userPreferences.highlightDefaults?.highlight?.highlightColor||"#ffd84d", snapToContent: userPreferences.snapToContent, annotations: [], bookmarks: [], layers: [], textBlocks: [], formFields: [], measurementScales: {}, selectedId: null, selectedIds: [], history: [], future: [], renderToken: 0, thumbnailRenderToken: 0, layoutRenderToken: 0 };
 let toolChest=loadToolChest(),activeToolChestTool=null;
 let stampPresets=loadStampPresets(),activeStampPreset=null,pendingStampImageAction="create";
+/*
+  Cache the few DOM nodes that are read or redrawn frequently. Keeping these
+  references here avoids repeated page-wide searches and makes the rendering
+  layers explicit: canvas = original PDF, text = selectable PDF text,
+  annotation = editable items, draw = temporary drafts and visual overlays.
+*/
 const els = { canvas: $("pdfCanvas"), shell: $("pageShell"), stage: $("pageStage"), empty: $("emptyState"), text: $("textLayer"), ann: $("annotationLayer"), draw: $("drawLayer") };
+/*
+  The variables below are short-lived interaction sessions and performance
+  caches, not additional saved document state. A `*Draft` exists only while a
+  new shape is being drawn; a `*Move`, `*Drag`, or `*Resize` stores pointer-down
+  data until pointer-up/cancel. Whenever a mode changes, its cleanup path must
+  release pointer capture, remove temporary DOM, and set the matching variable
+  back to null so a stale gesture cannot affect the next tool.
+*/
 let toastTimer;
 let cursorHintTimer;
 let selectionCursorHint="";
@@ -69,6 +143,14 @@ let areaHighlightMove=null;
 let areaHighlightResize=null;
 let activeManualFormFieldId=null;
 let manualFormFieldType="text";
+/*
+  The toolbar has one visible Select button, but it can represent either
+  Select or Lasso. This variable remembers which choice the user last made.
+  It is separate from `state.tool`: `state.tool` describes what the editor is
+  doing right now, while this value describes what the Select button should do
+  the next time its main (non-arrow) area is clicked.
+*/
+let selectedSelectionTool="select";
 let manualFormFieldMove=null;
 let manualFormFieldResize=null;
 let activeStickyNoteEditorId=null;
@@ -100,14 +182,23 @@ let recoveryReady=false;
 let recoveryStorageAvailable=true;
 let availableRecoveryRecord=null;
 let recoveryGeneration=0;
+// Remember the pointer for paste-at-pointer and cursor hints; passive keeps scrolling smooth.
 document.addEventListener("pointermove",event=>{lastDocumentPointer={x:event.clientX,y:event.clientY};},{passive:true});
 
+/* PDF SOURCE AND VIEWPORT HELPERS ------------------------------------------------
+   A page descriptor identifies a displayed page. It may refer to the original
+   PDF, an inserted document, or a blank page. These helpers translate that
+   descriptor into the PDF.js page and the viewport that must be drawn. */
 function sourceForDescriptor(descriptor){return state.pageSources.get(descriptor?.sourceKey||"primary")||state.pageSources.get("primary");}
 async function pdfPageForDescriptor(descriptor){const source=sourceForDescriptor(descriptor);if(!source?.pdf)throw new Error("The page source is not available.");return source.pdf.getPage(descriptor.sourceIndex);}
 function descriptorRotation(page,descriptor){return normalizePageRotation((page?.rotate||0)+(descriptor?.rotation||0));}
 function descriptorViewport(page,descriptor,scale){const full=page.getViewport({scale,rotation:descriptorRotation(page,descriptor)}),crop=descriptor?.crop;if(!crop)return{full,width:full.width,height:full.height,offsetX:0,offsetY:0};return{full,width:crop.w*scale,height:crop.h*scale,offsetX:crop.x*scale,offsetY:crop.y*scale};}
 function currentPageFormWidgets(){const descriptor=currentPageDescriptor();if(!descriptor)return[];const pageIndex=descriptor.blank?null:descriptor.sourceIndex-1,items=[];for(const field of state.formFields)for(const widget of field.widgets||[]){const onManualPage=field.manual&&widget.pageId===descriptor.id,onNativePage=!field.manual&&!descriptor.blank&&(descriptor.sourceKey||"primary")==="primary"&&widget.pageIndex===pageIndex;if((onManualPage||onNativePage)&&widget.bounds)items.push({field,widget});}return items;}
 
+/* CANVAS RENDERING ---------------------------------------------------------------
+   Rendering is asynchronous. A user can zoom or change pages before an older
+   render finishes, so each canvas keeps its current PDF.js task and cancels a
+   stale one before starting another. A cancellation is expected, not an error. */
 function renderWasCancelled(error){return error?.name==="RenderingCancelledException"||/render.*cancel/i.test(error?.message||"");}
 async function cancelCanvasRender(canvas){const task=canvasRenderTasks.get(canvas);if(!task)return;task.cancel();try{await task.promise;}catch(error){if(!renderWasCancelled(error))throw error;}finally{if(canvasRenderTasks.get(canvas)===task)canvasRenderTasks.delete(canvas);}}
 async function renderPdfCanvas(page,canvas,viewport,{ratio=1,isCurrent=()=>true,prepare=()=>{},width=viewport.width,height=viewport.height,offsetX=0,offsetY=0}={}){
@@ -119,6 +210,9 @@ async function renderPdfCanvas(page,canvas,viewport,{ratio=1,isCurrent=()=>true,
   return isCurrent();
 }
 
+/* POINTER, PAN, AND CURSOR-HINT HELPERS ------------------------------------------
+   These guards keep document shortcuts from interfering with typing in forms
+   and dialogs. The Space key is allowed to pan only over the document surface. */
 function spacePanBlocked(target){return target instanceof Element&&Boolean(target.closest("input,textarea,select,[contenteditable='true'],dialog[open]"));}
 function itemShortcutBlocked(target){return target instanceof Element&&Boolean(target.closest("textarea,select,[contenteditable='true'],dialog[open],input:not([type]),input[type='text'],input[type='search'],input[type='email'],input[type='url'],input[type='tel'],input[type='number'],input[type='password']"));}
 function setSpacePan(active){if(active&&(selectionRectangleDrag||lassoSelectionDrag))suppressClickAfterCanceledSelection();if(active)cancelSelectionGestures();panState.spaceHeld=active&&Boolean(state.pdf);$("canvasArea").classList.toggle("pan-ready",panState.spaceHeld);hideCursorToolHint();if(!panState.spaceHeld)stopPanDrag();}
@@ -157,6 +251,10 @@ $("canvasArea").addEventListener("pointerleave",()=>{hoverCursorHint="";hideCurs
 $("canvasArea").addEventListener("wheel",()=>{hoverCursorHint="";hideCursorToolHint();},{passive:true});
 document.addEventListener("pointerdown",()=>{hoverCursorHint="";hideCursorToolHint();},true);
 
+/* APPLICATION-LEVEL UI STATE -----------------------------------------------------
+   Theme, toast messages, undo history, and the current page live here. They
+   affect many features, so central helpers prevent individual tools from
+   updating only part of the interface. */
 function resolvedTheme(theme){return theme==="system"?(window.matchMedia?.("(prefers-color-scheme: dark)").matches?"dark":"light"):theme==="dark"?"dark":"light";}
 function applyTheme(theme=userPreferences.theme,persist=false){const preference=["light","dark","system"].includes(theme)?theme:"system",selected=resolvedTheme(preference);document.documentElement.dataset.theme=selected;const button=$("themeToggle"),dark=selected==="dark";button.setAttribute("aria-pressed",String(dark));button.setAttribute("aria-label",dark?"Use light mode":"Use dark mode");button.title=dark?"Use light mode":"Use dark mode";if($("settingsTheme"))$("settingsTheme").value=preference;if(persist){userPreferences.theme=preference;saveUserPreferences();}}
 applyTheme();
@@ -182,8 +280,16 @@ function syncPageNumbers(){syncAnnotationPages(state.pages,state.annotations);}
 function pageToolTargetIds(){return selectedPageIds(state.pages,state.selectedPageIds,state.page);}
 function updatePageTools(){const count=state.pages.length,selected=state.selectedPageIds.filter(id=>state.pages.some(page=>page.id===id)),targets=pageToolTargetIds(),all=Boolean(count)&&selected.length===count;$("selectAllPages").checked=all;$("selectAllPages").indeterminate=selected.length>0&&!all;$("selectAllPages").disabled=!state.pdf;$("pageSelectionStatus").textContent=selected.length?`${selected.length} selected`:state.pdf?"Current page":"No PDF";for(const id of ["rotatePagesLeft","rotatePagesRight","duplicatePages","replacePages","extractPages"])$(id).disabled=!state.pdf||!targets.length;$("cropPage").disabled=!state.pdf||targets.length!==1;}
 function updatePageUi(){const count=state.pages.length;$("pageCount").textContent=`${count} ${count===1?"page":"pages"}`;$("totalPages").textContent=count;updatePageTools();renderTakeoffSummary();}
+/* SIDEBAR PANELS: SEARCH, BOOKMARKS, LAYERS, TOOL CHEST, AND TAKEOFF ------------
+   Selecting a tab updates the ARIA tab state and lazily redraws the requested
+   panel. Rendering on demand avoids work for panels that are currently hidden. */
 function setSidebarTab(kind){const button=document.querySelector(`[data-sidebar-tab="${kind}"]`);if(!button)return;document.querySelectorAll("[data-sidebar-tab]").forEach(tab=>{const active=tab===button;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});for(const panel of document.querySelectorAll(".sidebar-panel")){const active=panel.id===button.getAttribute("aria-controls");panel.hidden=!active;panel.classList.toggle("active",active);}if(kind==="layers")renderLayers();if(kind==="tool-chest")renderToolChest();if(kind==="search")renderDocumentSearchResults();if(kind==="bookmarks")renderBookmarks();if(kind==="takeoff")renderTakeoffSummary();}
 function openDocumentSearch(){setSidebarTab("search");$("sidebar").classList.add("open");const input=$("documentSearchInput");input.focus();input.select();}
+/*
+  Search indexes PDF text one page at a time and caches the index by page ID.
+  `documentSearch.token` is a simple cancellation number: an older asynchronous
+  search stops when its saved token no longer matches the latest token.
+*/
 function resetDocumentSearch(){documentSearch.token+=1;clearTimeout(documentSearch.timer);documentSearch.cache.clear();documentSearch.results=[];documentSearch.activeIndex=-1;documentSearch.running=false;documentSearch.truncated=false;const input=$("documentSearchInput"),enabled=Boolean(state.pdf);input.value="";input.disabled=!enabled;$("documentSearchButton").disabled=!enabled;$("documentSearchStatus").textContent=enabled?"Enter text to search this PDF.":"Open a PDF to search its text.";renderDocumentSearchResults();renderDocumentSearchHighlights();}
 function renderDocumentSearchResults(){const results=documentSearch.results,count=results.length,active=documentSearch.activeIndex,list=$("documentSearchResults"),query=$("documentSearchInput").value.trim();$("searchResultCount").textContent=`${count.toLocaleString()}${documentSearch.truncated?"+":""} ${count===1?"result":"results"}`;$("searchResultPosition").textContent=active>=0&&results[active]?`${active+1} of ${count}${documentSearch.truncated?"+":""}`:"No result selected";$("previousSearchResult").disabled=documentSearch.running||!count;$("nextSearchResult").disabled=documentSearch.running||!count;list.innerHTML="";for(const [index,result] of results.entries()){const pageIndex=state.pages.findIndex(page=>page.id===result.pageId);if(pageIndex<0)continue;const item=document.createElement("li"),button=document.createElement("button"),page=document.createElement("span"),text=document.createElement("span");button.type="button";button.classList.toggle("active",index===active);button.setAttribute("aria-current",index===active?"true":"false");page.className="document-search-result-page";page.textContent=`Page ${pageNumberLabel(state.pages[pageIndex],pageIndex)}`;text.className="document-search-result-text";text.textContent=result.excerpt;button.append(page,text);button.onclick=()=>activateDocumentSearchResult(index);item.append(button);list.append(item);}$("documentSearchEmpty").hidden=documentSearch.running||!query||Boolean(count);if(active>=0&&!$("searchPanel").hidden)list.querySelector("button.active")?.scrollIntoView({block:"nearest"});}
 async function searchIndexForPage(descriptor){if(documentSearch.cache.has(descriptor.id))return documentSearch.cache.get(descriptor.id);let index;if(descriptor.blank)index=createSearchPageIndex(descriptor.id,null,[]);else{const page=await pdfPageForDescriptor(descriptor),content=await page.getTextContent();index=createSearchPageIndex(descriptor.id,descriptor.sourceIndex,content.items);}documentSearch.cache.set(descriptor.id,index);return index;}
@@ -193,6 +299,7 @@ function refreshDocumentSearchPageOrder(){if(!documentSearch.results.length)retu
 async function activateDocumentSearchResult(index){if(index<0||index>=documentSearch.results.length)return;documentSearch.activeIndex=index;const result=documentSearch.results[index],pageIndex=state.pages.findIndex(page=>page.id===result.pageId);if(pageIndex<0){refreshDocumentSearchPageOrder();return;}if(state.page!==pageIndex+1)await goPage(pageIndex+1,{scrollIntoView:true});else renderDocumentSearchHighlights();renderDocumentSearchResults();requestAnimationFrame(()=>els.draw.querySelector(".search-result-box.active")?.scrollIntoView({block:"center",inline:"center"}));}
 function moveDocumentSearchResult(direction){const index=nextSearchResultIndex(documentSearch.activeIndex,documentSearch.results.length,direction);if(index>=0)void activateDocumentSearchResult(index);}
 function renderDocumentSearchHighlights(){els.draw.querySelectorAll(".search-result-box").forEach(item=>item.remove());if(!documentSearch.results.length)return;const pageId=currentPageDescriptor()?.id,pageRect=els.shell.getBoundingClientRect();for(const [resultIndex,result] of documentSearch.results.entries()){if(result.pageId!==pageId)continue;for(const segment of result.segments){const span=els.text.querySelector(`[data-search-item="${segment.itemIndex}"]`),node=span?.firstChild;if(!node||node.nodeType!==Node.TEXT_NODE)continue;const start=Math.max(0,Math.min(node.textContent.length,segment.start)),end=Math.max(start,Math.min(node.textContent.length,segment.end));if(end<=start)continue;const range=document.createRange();range.setStart(node,start);range.setEnd(node,end);for(const rect of range.getClientRects()){if(!rect.width||!rect.height)continue;const box=document.createElement("div");box.className=`search-result-box${resultIndex===documentSearch.activeIndex?" active":""}`;box.style.left=`${rect.left-pageRect.left}px`;box.style.top=`${rect.top-pageRect.top}px`;box.style.width=`${rect.width}px`;box.style.height=`${rect.height}px`;els.draw.append(box);}}}}
+/* Bookmarks are stored as a tree; `flattenBookmarks()` supplies each row and nesting depth for the list. */
 function renderBookmarks(){const list=$("bookmarkList"),rows=flattenBookmarks(state.bookmarks),count=bookmarkCount(state.bookmarks);$("bookmarkCount").textContent=`${count} ${count===1?"bookmark":"bookmarks"}`;$("addBookmarkButton").disabled=!state.pdf;$("bookmarksEmpty").hidden=Boolean(count);$("bookmarksEmpty").textContent=state.pdf?"This document has no bookmarks. Add one for the current page.":"Open a PDF, then add a bookmark for the current page.";list.innerHTML="";for(const {bookmark,depth} of rows){const row=document.createElement("div"),target=document.createElement("button"),title=document.createElement("strong"),page=document.createElement("small"),actions=document.createElement("div"),pageNumber=bookmarkPageNumber(bookmark,state.pages);row.className="bookmark-row";row.style.setProperty("--bookmark-depth",String(depth));row.setAttribute("role","treeitem");row.setAttribute("aria-level",String(depth+1));target.type="button";target.className="bookmark-target";target.disabled=!pageNumber;target.title=pageNumber?`Open ${bookmark.title} on page ${pageNumber}`:"Bookmark heading";title.textContent=bookmark.title;title.style.fontWeight=bookmark.bold?"700":"600";title.style.fontStyle=bookmark.italic?"italic":"normal";if(bookmark.color)title.style.color=`rgb(${bookmark.color.map(value=>Math.round(value*255)).join(",")})`;page.textContent=pageNumber?`Page ${pageNumberLabel(state.pages[pageNumber-1],pageNumber-1)}`:"Heading";target.append(title,page);target.onclick=()=>openBookmark(bookmark);actions.className="bookmark-actions";const action=(icon,label,handler)=>{const button=document.createElement("button");button.type="button";button.title=label;button.setAttribute("aria-label",label);button.innerHTML=`<span class="ui-icon ${icon}" aria-hidden="true"></span>`;button.onclick=handler;actions.append(button);return button;};action("icon-arrow-up",`Move ${bookmark.title} up`,()=>moveDocumentBookmark(bookmark.id,-1));action("icon-arrow-down",`Move ${bookmark.title} down`,()=>moveDocumentBookmark(bookmark.id,1));action("icon-pencil",`Rename ${bookmark.title}`,()=>renameDocumentBookmark(bookmark.id));action("icon-trash",`Delete ${bookmark.title}`,()=>deleteDocumentBookmark(bookmark.id));row.append(target,actions);list.append(row);}}
 function addCurrentPageBookmark(){if(!state.pdf)return;const suggested=`Page ${state.page}`,title=window.prompt("Bookmark name",suggested)?.trim();if(!title)return;state.bookmarks.push(makeBookmark(title,currentPageDescriptor()?.id));renderBookmarks();markChanged();toast("Bookmark added.");}
 function renameDocumentBookmark(id){const bookmark=state.bookmarks.length&&flattenBookmarks(state.bookmarks).find(row=>row.bookmark.id===id)?.bookmark;if(!bookmark)return;const title=window.prompt("Bookmark name",bookmark.title)?.trim();if(!title||title===bookmark.title)return;if(renameBookmark(state.bookmarks,id,title)){renderBookmarks();markChanged();toast("Bookmark renamed.");}}
@@ -200,9 +307,17 @@ function deleteDocumentBookmark(id){const bookmark=flattenBookmarks(state.bookma
 function moveDocumentBookmark(id,direction){if(!moveBookmark(state.bookmarks,id,direction)){toast("This bookmark cannot move further.");return;}renderBookmarks();markChanged();}
 async function openBookmark(bookmark){const page=bookmarkPageNumber(bookmark,state.pages);if(!page){toast("This bookmark has no page destination.");return;}await goPage(page,{scrollIntoView:true});}
 function syncSelectedLayer(annotation){const select=$("selectedLayer");select.innerHTML='<option value="">No layer</option>';for(const layer of state.layers){const option=document.createElement("option");option.value=layer.id;option.textContent=layer.name;select.append(option);}select.value=annotation?.layerId&&state.layers.some(layer=>layer.id===annotation.layerId)?annotation.layerId:"";if(annotation)$("selectedVisibility").checked=annotation.visible!==false;const locked=Boolean(annotation&&isAnnotationLocked(annotation));$("inspectorContent").classList.toggle("locked-item",locked);for(const control of $("inspectorContent").querySelectorAll("input,select,textarea,button"))control.disabled=locked;$("deleteButton").disabled=locked||!annotation;$("deleteButton").title=locked?`Layer "${annotation.layerName}" is locked.`:"Delete selected item";}
+/* LAYERS -------------------------------------------------------------------------
+   Layer settings are copied onto their items before views are redrawn. This
+   lets rendering, editing, thumbnails, and export all use the same visibility,
+   lock, and print decisions. */
 function refreshLayerDependentViews(){for(const annotation of state.annotations){const layer=state.layers.find(item=>item.id===annotation.layerId);if(layer){annotation.layerVisible=layer.visible!==false;annotation.layerLocked=layer.locked===true;annotation.layerPrintable=layer.printable!==false;}}renderLayers();renderAnnotations();renderThumbnails();markChanged();}
 function renderLayers(){const list=$("layerList");if(!list)return;list.innerHTML="";$("layerCount").textContent=`${state.layers.length} ${state.layers.length===1?"layer":"layers"}`;$("layersEmpty").hidden=Boolean(state.layers.length);for(const layer of state.layers){const row=document.createElement("div");row.className="layer-row";const visible=document.createElement("input");visible.type="checkbox";visible.checked=layer.visible!==false;visible.title="Show this layer on the page";visible.setAttribute("aria-label",`${visible.checked?"Hide":"Show"} ${layer.name}`);visible.onchange=()=>{layer.visible=visible.checked;refreshLayerDependentViews();};const details=document.createElement("div"),name=document.createElement("div"),count=document.createElement("div");name.className="layer-row-name";name.textContent=layer.name;name.title="Double-click to rename";name.ondblclick=()=>{const next=window.prompt("Layer name",layer.name)?.trim();if(!next||next===layer.name)return;if(state.layers.some(item=>item.id!==layer.id&&item.name.toLowerCase()===next.toLowerCase())){toast("A layer with this name already exists.");return;}layer.name=next.slice(0,80);for(const annotation of state.annotations)if(annotation.layerId===layer.id)annotation.layerName=layer.name;refreshLayerDependentViews();syncSelectedLayer(state.annotations.find(item=>item.id===state.selectedId));};count.className="layer-row-count";const amount=layerItemCount(state.annotations,layer.id);count.textContent=`${amount} ${amount===1?"item":"items"}`;details.append(name,count);const locked=document.createElement("button");locked.type="button";locked.className=`layer-toggle ${layer.locked?"active":""}`;locked.title=layer.locked?"Unlock this layer":"Lock this layer";locked.setAttribute("aria-label",`${layer.locked?"Unlock":"Lock"} ${layer.name}`);locked.setAttribute("aria-pressed",String(layer.locked===true));locked.innerHTML=`<span class="ui-icon ${layer.locked?"icon-lock":"icon-lock-open"}" aria-hidden="true"></span>`;locked.onclick=()=>{layer.locked=!layer.locked;refreshLayerDependentViews();clearSelection();toast(layer.locked?`${layer.name} locked.`:`${layer.name} unlocked.`);};const printable=document.createElement("button");printable.type="button";printable.className=`layer-toggle ${layer.printable!==false?"active":""}`;printable.title=layer.printable!==false?"Exclude this layer from exported PDFs":"Include this layer in exported PDFs";printable.setAttribute("aria-label",`${layer.printable!==false?"Do not print":"Print"} ${layer.name}`);printable.setAttribute("aria-pressed",String(layer.printable!==false));printable.innerHTML='<span class="ui-icon icon-printer" aria-hidden="true"></span>';printable.onclick=()=>{layer.printable=layer.printable===false;refreshLayerDependentViews();toast(layer.printable?`${layer.name} will print.`:`${layer.name} will not print.`);};const remove=document.createElement("button");remove.type="button";remove.className="delete-layer";remove.title="Delete layer and move its items to No layer";remove.setAttribute("aria-label",`Delete ${layer.name}`);remove.innerHTML='<span class="ui-icon icon-trash" aria-hidden="true"></span>';remove.onclick=()=>{if(!window.confirm(`Delete layer "${layer.name}"? Its items will move to No layer.`))return;removeLayer(state.layers,state.annotations,layer.id);refreshLayerDependentViews();syncSelectedLayer(state.annotations.find(item=>item.id===state.selectedId));};row.append(visible,details,locked,printable,remove);list.append(row);}}
 function addDocumentLayer(){if(!state.pdf){toast("Open a PDF before you add a layer.");return;}const name=window.prompt("New layer name")?.trim();if(!name)return;if(state.layers.some(layer=>layer.name.toLowerCase()===name.toLowerCase())){toast("A layer with this name already exists.");return;}state.layers.push(createLayer(name));renderLayers();syncSelectedLayer(state.annotations.find(item=>item.id===state.selectedId));markChanged();}
+/* TOOL CHEST AND STAMPS ----------------------------------------------------------
+   A Tool Chest entry stores style settings separately from an item's location.
+   Activating an entry changes what future compatible items look like; it does
+   not mutate existing items until a tool is applied to them. */
 function selectedToolChestItem(){return state.annotations.find(item=>item.id===state.selectedId&&["text","highlight","markup","measurement"].includes(item.type)&&item.measureKind!=="calibration");}
 function toolLabel(kind){return kind.replace(":"," ").replace(/\b\w/g,value=>value.toUpperCase());}
 function toolChestPreview(tool){const host=document.createElement("div"),svg=createSvgElement("svg",{viewBox:"0 0 52 36","aria-hidden":"true"}),properties=tool.properties||{},kind=tool.kind,stroke=properties.strokeColor||properties.lineColor||properties.borderColor||properties.highlightColor||properties.color||"#d04a3a",fill=properties.fillColor||properties.backgroundColor||properties.highlightColor||"#fff2a8",width=Math.max(1,Math.min(4,properties.strokeWidth||properties.lineWidth||properties.borderWidth||2)),add=(name,attributes={},styles={})=>{const shape=createSvgElement(name,attributes);Object.assign(shape.style,styles);svg.append(shape);return shape;};host.className="tool-chest-preview";
@@ -226,10 +341,14 @@ function activateChestTool(tool){activeToolChestTool=tool;const [group,kind]=too
 function applyActiveChestTool(item){if(activeToolChestTool&&toolKind(item)===activeToolChestTool.kind)applyToolProperties(item,activeToolChestTool);}
 function stampPresetElement(preset,removable=false){const row=document.createElement("div"),sample=preset.stampKind==="image"?document.createElement("img"):document.createElement("span");row.className="stamp-preset";row.tabIndex=0;row.setAttribute("role","button");row.title=`Place ${preset.name}`;row.setAttribute("aria-label",`Place ${preset.name}`);if(preset.stampKind==="image"){sample.className="stamp-preset-image";sample.src=preset.imageDataUrl;sample.alt="";}else{sample.className="stamp-preset-sample";sample.textContent=preset.text;sample.style.setProperty("--stamp-stroke",preset.strokeColor);sample.style.setProperty("--stamp-fill",hexToCssRgba(preset.fillColor,preset.fillOpacity));sample.style.setProperty("--stamp-text",preset.textColor);}const activate=()=>activateStampPreset(preset);row.onclick=activate;row.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();activate();}};row.append(sample);if(removable){const remove=document.createElement("button");remove.type="button";remove.className="stamp-preset-remove";remove.title=`Delete ${preset.name}`;remove.setAttribute("aria-label",`Delete ${preset.name}`);remove.innerHTML='<span class="ui-icon icon-trash" aria-hidden="true"></span>';remove.onclick=event=>{event.stopPropagation();stampPresets=stampPresets.filter(item=>item.id!==preset.id);saveStampPresets();renderStampMenu();toast(`${preset.name} deleted.`);};row.append(remove);}return row;}
 function renderStampMenu(){const standards=$("standardStampPresets"),saved=$("savedStampPresets");if(!standards||!saved)return;standards.replaceChildren(...STANDARD_STAMP_PRESETS.map(preset=>stampPresetElement(preset)));saved.replaceChildren(...stampPresets.map(preset=>stampPresetElement(preset,true)));$("savedStampCount").textContent=`${stampPresets.length} saved`;$("savedStampEmpty").hidden=Boolean(stampPresets.length);}
-function activateStampPreset(preset){const safe=sanitizeStampPreset(preset,{allowBuiltIn:true});if(!safe)return;activeStampPreset=safe;activeToolChestTool=null;renderToolChest();setTool("markup-stamp");$("stampMenu").hidden=true;toast(`${safe.name} stamp is active.`);}
+function activateStampPreset(preset){const safe=sanitizeStampPreset(preset,{allowBuiltIn:true});if(!safe)return;activeStampPreset=safe;activeToolChestTool=null;renderToolChest();setTool("markup-stamp");closeToolPalette("stampMenu");toast(`${safe.name} stamp is active.`);}
 function readStampImage(file){return new Promise((resolve,reject)=>{if(!file||!['image/png','image/jpeg'].includes(file.type)){reject(new Error("Choose a PNG or JPEG image."));return;}if(file.size>MAX_STAMP_IMAGE_BYTES){reject(new Error("The stamp image must be smaller than 700 KB."));return;}const reader=new FileReader();reader.onerror=()=>reject(new Error("The stamp image could not be read."));reader.onload=()=>{const dataUrl=String(reader.result||"");if(!isSafeStampImageDataUrl(dataUrl)){reject(new Error("The stamp image is not valid."));return;}const image=new Image();image.onerror=()=>reject(new Error("The stamp image could not be opened."));image.onload=()=>resolve({dataUrl,aspectRatio:Math.max(.1,Math.min(10,image.naturalWidth/Math.max(1,image.naturalHeight)))});image.src=dataUrl;};reader.readAsDataURL(file);});}
 async function useStampImageFile(file){try{const image=await readStampImage(file);if(pendingStampImageAction==="replace"){const annotation=state.annotations.find(item=>item.id===state.selectedId&&item.type==="markup"&&item.markupKind==="stamp");if(!annotation||blockLockedEdit(annotation))return;snapshot();Object.assign(annotation,{stampKind:"image",imageDataUrl:image.dataUrl,imageMimeType:file.type,aspectRatio:image.aspectRatio,text:"",strokeWidth:0,fillOpacity:0});renderAnnotations();syncStampControls(annotation);markChanged();queueThumbnailRefresh(annotation.pageId);toast("Stamp image replaced.");}else{const name=file.name.replace(/\.[^.]+$/,""),preset=makeImageStampPreset({name,imageDataUrl:image.dataUrl,aspectRatio:image.aspectRatio});if(preset)activateStampPreset(preset);}}catch(error){toast(error.message||"The stamp image could not be used.");}finally{$("stampImageFileInput").value="";pendingStampImageAction="create";}}
 function downloadFile(text,name,type="application/json"){const url=URL.createObjectURL(new Blob([text],{type})),link=document.createElement("a");link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+/* TAKEOFF SUMMARY AND LIVE LEGEND ------------------------------------------------
+   A takeoff is a grouped summary of measurement annotations. The table and
+   optional legend do not own another copy of the values; they recalculate from
+   `state.annotations` so changes to measurements appear everywhere consistently. */
 function currentTakeoffRows(){const scopePageId=$("takeoffScope")?.value==="page"?currentPageDescriptor()?.id:null;return buildTakeoffSummary(state.annotations,state.pages,{groupBy:$("takeoffGroupBy")?.value||"type",scopePageId});}
 function syncLiveLegendHint(rows=currentTakeoffRows()){const ready=liveLegendHintOpen&&Boolean(rows.length)&&Boolean(state.pdf);$("liveLegendCallout").hidden=!ready;$("placeTakeoffLegend").classList.toggle("feature-ready",ready);$("takeoffTab").classList.toggle("feature-ready",ready);}
 function dismissLiveLegendHint(){liveLegendHintOpen=false;syncLiveLegendHint();}
@@ -244,7 +363,112 @@ const legendColumnRatios=[.02,.34,.44,.57,.70,.82];
 function refreshLegendText(annotation){annotation.legendText=legendDisplayLines(annotation).join("\n");return annotation.legendText;}
 function placeTakeoffLegend(){const rows=currentTakeoffRows(),descriptor=currentPageDescriptor();if(!state.pdf||!descriptor||!rows.length){toast("Add measurements before you place a legend.");return;}dismissLiveLegendHint();const factor=state.scale*1.25,pageSize={width:els.shell.clientWidth/factor,height:els.shell.clientHeight/factor},width=Math.min(390,Math.max(180,pageSize.width-24)),height=Math.min(pageSize.height-24,Math.max(90,48+rows.length*17)),x=Math.max(12,(pageSize.width-width)/2),y=Math.max(12,(pageSize.height-height)/2),annotation=makeMarkup("legend",[{x,y},{x:x+width,y:y+height}],state.page,descriptor.id,crypto.randomUUID());annotation.legendGroupBy=$("takeoffGroupBy").value;annotation.legendScope=$("takeoffScope").value;applyItemDefault(annotation,userPreferences);refreshLegendText(annotation);setTool("select");snapshot();state.annotations.push(annotation);renderAnnotations();markChanged();queueThumbnailRefresh(annotation.pageId);selectMarkup(annotation.id);toast("Live takeoff legend placed.");}
 function cancelPageCropDraft(){pageCropDrag=null;$("pageCropDraft")?.remove();els.shell.classList.remove("page-crop-active");$("cropPage")?.classList.remove("active");}
-function setTool(tool) { const keepSelection=(state.tool==="select"&&tool==="lasso")||(state.tool==="lasso"&&tool==="select")||(state.tool==="lasso"&&tool==="lasso"),toggleForms=state.tool==="forms"||tool==="forms";if(formatPainter.active)stopFormatPainter(false);activeStickyNoteEditorId=null;stickyNoteEditorSnapshot=false;cancelMeasurementDraft();cancelMarkupDraft();cancelPageCropDraft();cancelSelectionGestures();closeSelectToolMenu();closeFormToolMenu();hoverCursorHint="";hideCursorToolHint();if(!tool.startsWith("markup-stamp"))activeStampPreset=null;state.tool=tool; document.querySelectorAll(".tool").forEach(b=>{ const active=b.dataset.tool===tool||(b.id==="selectButton"&&tool==="lasso")||(b.dataset.tool==="measure"&&tool.startsWith("measure-"))||(b.dataset.tool==="markup"&&tool.startsWith("markup-")&&tool!=="markup-stamp")||(b.dataset.tool==="stamp"&&tool==="markup-stamp"); b.classList.toggle("active",active); b.setAttribute("aria-pressed",String(active)); }); $("highlightPalette").hidden=tool!=="highlight"; els.shell.className=`page-shell tool-${tool}`; if(!keepSelection)clearSelection(); if(state.pdf){$("saveState").textContent="Changes saved locally";if(toggleForms)renderAnnotations();}scheduleCursorToolHintForTool(); }
+/*
+  Update the Select split button and every matching item in its menu.
+
+  This function only changes the interface; it does not change the editor
+  tool. `setTool()` does that first, then calls this function so the screen,
+  mouse behavior, tooltip, and screen-reader shortcut description all agree.
+*/
+function syncSelectToolControl(){
+  const lasso=selectedSelectionTool==="lasso",button=$("selectButton"),icon=$("selectButtonIcon");
+
+  // `data-tool` is used later by the generic active-button code in setTool().
+  button.dataset.tool=selectedSelectionTool;
+  button.title=lasso?"Activate Lasso (Shift+V)":"Activate Select (V)";
+  button.setAttribute("aria-keyshortcuts",lasso?"Shift+V":"V");
+  $("selectButtonLabel").textContent=lasso?"Lasso":"Select";
+
+  // Toggle the CSS icon classes rather than recreating the icon DOM element.
+  icon.classList.toggle("icon-pointer",!lasso);
+  icon.classList.toggle("icon-lasso",lasso);
+
+  // The menu uses radio-style semantics: exactly one choice is selected.
+  for(const choice of $("selectToolMenu").querySelectorAll("[data-selection-tool]")){
+    const selected=choice.dataset.selectionTool===selectedSelectionTool;
+    choice.classList.toggle("selected",selected);
+    choice.setAttribute("aria-checked",String(selected));
+  }
+}
+
+/*
+  Shared updater for the Markup and Measure palette buttons.
+
+  A tool name such as `markup-note` contains a group (`markup-`) and a kind
+  (`note`). The configuration object tells this generic helper which HTML
+  button and menu attribute belong to each group. Reusing one helper prevents
+  Markup and Measure from drifting into subtly different behavior.
+*/
+function syncModeToolButton(tool,{buttonId,iconId,labelId,prefix,choiceAttribute,fallbackLabel,fallbackIcon}){
+  const kind=tool.startsWith(prefix)?tool.slice(prefix.length):"";
+  const choice=kind?document.querySelector(`[${choiceAttribute}="${kind}"]`):null;
+
+  // If this mode is not active, use the stable default label and icon.
+  const label=choice?.querySelector("strong")?.textContent||fallbackLabel;
+  const choiceIcon=choice?.querySelector(".ui-icon");
+  const nextIcon=[...choiceIcon?.classList||[]].find(name=>name.startsWith("icon-"))||fallbackIcon;
+  const icon=$(iconId);
+
+  // Remember the previous icon class so only this component's icon is removed.
+  icon.classList.remove(icon.dataset.toolIcon||fallbackIcon);
+  icon.classList.add(nextIcon);
+  icon.dataset.toolIcon=nextIcon;
+  $(labelId).textContent=label;
+  $(buttonId).title=choice?`Open ${fallbackLabel.toLowerCase()} tools. Active tool: ${label}.`:`Open drawing ${fallbackLabel.toLowerCase()} tools`;
+}
+
+// Supply the small differences between the two palette families to the helper above.
+function syncMarkupMeasureToolControls(tool){
+  syncModeToolButton(tool,{buttonId:"markupButton",iconId:"markupButtonIcon",labelId:"markupButtonLabel",prefix:"markup-",choiceAttribute:"data-markup-tool",fallbackLabel:"Markup",fallbackIcon:"icon-shapes"});
+  syncModeToolButton(tool,{buttonId:"measureButton",iconId:"measureButtonIcon",labelId:"measureButtonLabel",prefix:"measure-",choiceAttribute:"data-measure-tool",fallbackLabel:"Measure",fallbackIcon:"icon-ruler"});
+}
+
+/*
+  Make `tool` the editor's active mode and bring every related part of the UI
+  up to date. Treat this as the single entry point for changing tools: callers
+  should not set `state.tool` directly, or open menus/drafts may be left behind.
+*/
+function setTool(tool) {
+  // Moving between Select and Lasso is still selection work, so preserve it.
+  const keepSelection=(state.tool==="select"&&tool==="lasso")||(state.tool==="lasso"&&tool==="select")||(state.tool==="lasso"&&tool==="lasso");
+  const toggleForms=state.tool==="forms"||tool==="forms";
+
+  // Stop unfinished, tool-specific interactions before starting another mode.
+  if(formatPainter.active)stopFormatPainter(false);
+  activeStickyNoteEditorId=null;
+  stickyNoteEditorSnapshot=false;
+  cancelMeasurementDraft();
+  cancelMarkupDraft();
+  cancelPageCropDraft();
+  cancelSelectionGestures();
+  closeSelectToolMenu();
+  closeFormToolMenu();
+  closeAllToolPalettes();
+  hoverCursorHint="";
+  hideCursorToolHint();
+
+  if(!tool.startsWith("markup-stamp"))activeStampPreset=null;
+  if(tool==="select"||tool==="lasso")selectedSelectionTool=tool;
+  state.tool=tool;
+
+  // Refresh dynamic labels/icons before marking the toolbar buttons active.
+  syncSelectToolControl();
+  syncMarkupMeasureToolControls(tool);
+  document.querySelectorAll(".tool").forEach(button=>{
+    const active=button.dataset.tool===tool||(button.id==="selectButton"&&(tool==="select"||tool==="lasso"))||(button.dataset.tool==="measure"&&tool.startsWith("measure-"))||(button.dataset.tool==="markup"&&tool.startsWith("markup-")&&tool!=="markup-stamp")||(button.dataset.tool==="stamp"&&tool==="markup-stamp");
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-pressed",String(active));
+  });
+
+  $("highlightPalette").hidden=tool!=="highlight";
+  els.shell.className=`page-shell tool-${tool}`;
+  if(!keepSelection)clearSelection();
+  if(state.pdf){
+    $("saveState").textContent="Changes saved locally";
+    if(toggleForms)renderAnnotations();
+  }
+  scheduleCursorToolHintForTool();
+}
 function updateItemClipboardButtons(){const selected=state.annotations.find(item=>item.id===state.selectedId),copyable=isCopyablePageItem(selected),paintable=isFormatPaintableItem(selected);$("copyItemButton").disabled=!copyable;$("pasteItemButton").disabled=!itemClipboard||!state.pdf;$("formatPainterButton").disabled=!paintable&&!formatPainter.active;if($("saveSelectedTool"))$("saveSelectedTool").disabled=!selectedToolChestItem();}
 function updateItemDefaultControls(item){syncSelectedLayer(item);const rotatable=canRotatePageItem(item);$("selectedRotationField").hidden=!rotatable;if(rotatable)$("selectedRotation").value=Math.round(normalizeRotation(item.rotation||0)*10)/10;const type=preferenceType(item),controls=$("itemDefaultControls");controls.hidden=!type;if(!type)return;const name=item.type==="text"?"Insert Text":item.type==="highlight"?"Highlight":item.type==="sticky-note"?"Sticky Note":item.type==="markup"?(MARKUP_LABELS[item.markupKind]||"Markup"):`${item.measureKind[0].toUpperCase()}${item.measureKind.slice(1)} measurement`,saved=Boolean(userPreferences[type.group][type.kind]);$("itemDefaultName").textContent=`${name} defaults`;$("itemDefaultStatus").textContent=saved?"A saved default is active for this item type.":"This item type uses the built-in default.";$("setItemDefault").title=`Use these properties for new ${name} items.`;$("resetItemDefault").title=`Restore the built-in properties for new ${name} items.`;$("resetItemDefault").disabled=!saved;}
 function clearSelection() { const editor=els.ann.querySelector("textarea.annotation-editor"),hadSelection=Boolean(state.selectedId||state.selectedIds.length); if(editor){const a=state.annotations.find(x=>x.id===editor.dataset.id);if(a)a.text=editor.value;} state.selectedId=null;state.selectedIds=[];selectedControlPoint=null;selectionCursorHint="";hideCursorToolHint();if(state.tool==="select"&&state.pdf)$("saveState").textContent="Changes saved locally"; if(editor||hadSelection)renderAnnotations();else document.querySelectorAll(".annotation,.markup-item,.measurement-item").forEach(e=>e.classList.remove("selected")); const empty=$("inspectorEmpty");empty.querySelector("strong").textContent="No item selected";empty.querySelector("p").textContent="Select an annotation to change its style.";$("inspector").classList.remove("open"); empty.hidden=false; $("inspectorContent").hidden=true;$("batchProperties").hidden=true;$("itemDefaultControls").hidden=true; $("deleteButton").disabled=true;updateItemClipboardButtons();renderMarkupsList(); }
@@ -270,6 +494,12 @@ function renderBatchProperties(){const items=batchItems();if(!items.length)retur
   const allRotatable=items.every(canRotatePageItem);$("batchRotationGroup").hidden=!allRotatable;if(allRotatable)setBatchNumber("batchRotation",batchCommon(items,item=>normalizeRotation(item.rotation||0)));
   const geometryAdapters=items.map(batchGeometryAdapter),allGeometry=geometryAdapters.every(Boolean);$("batchGeometryGroup").hidden=!allGeometry;$("batchBoxWidth").closest("span").hidden=allStickyNotes;$("batchBoxHeight").closest("span").hidden=allStickyNotes;if(allGeometry){setBatchNumber("batchPosX",batchCommon(items,(item,index)=>item[geometryAdapters[index].x]??0));setBatchNumber("batchPosY",batchCommon(items,(item,index)=>item[geometryAdapters[index].y]??0));setBatchNumber("batchBoxWidth",batchCommon(items,(item,index)=>item[geometryAdapters[index].w]??0));setBatchNumber("batchBoxHeight",batchCommon(items,(item,index)=>item[geometryAdapters[index].h]??0));}
 }
+/* MULTI-SELECTION, BATCH PROPERTIES, AND ARRANGEMENT -----------------------------
+   A batch property can apply to different item types. Adapter helpers map a
+   user-facing property (for example, line colour) to the correct field on each
+   compatible item. Locked or incompatible items are skipped rather than
+   partially changing the rest of an item. Every successful batch edit starts
+   with `snapshot()` so Undo treats the whole operation as one action. */
 function applyBatchProperty(label,adapter,value){const items=batchItems(),targets=[];let skipped=0;for(const item of items){const property=adapter(item);if(!property||isAnnotationLocked(item)){skipped++;continue;}targets.push({item,property});}if(!targets.length){toast(`No compatible unlocked items for ${label}.`);return;}snapshot();for(const {item,property} of targets){if(typeof property==="function")property(item,value);else item[property]=value;if(item.autoFit&&["Text","Flag text","Font","Font size","Auto-fit text box","Bold","Italic","Underline","Horizontal alignment","Vertical alignment"].includes(label))fitAnnotationToText(item);}renderAnnotations();markChanged();renderLayers();for(const pageId of new Set(targets.map(target=>target.item.pageId)))queueThumbnailRefresh(pageId);renderBatchProperties();toast(`${label} applied to ${targets.length} ${targets.length===1?"item":"items"}${skipped?`; ${skipped} skipped`:""}.`);}
 function applySelectionArrangement(command){
   const selected=orderedBatchItems(),unlocked=selected.filter(item=>!isAnnotationLocked(item)),lockedCount=selected.length-unlocked.length,factor=state.scale*1.25,pageSize={width:els.shell.clientWidth/factor,height:els.shell.clientHeight/factor};
@@ -351,6 +581,11 @@ window.addEventListener("pointerup",finishGroupMove);
 window.addEventListener("pointercancel",finishGroupMove);
 document.addEventListener("pointerdown",finishKeyboardMove,true);
 els.shell.addEventListener("click",event=>{if(!suppressGroupMoveClick)return;suppressGroupMoveClick=false;event.preventDefault();event.stopImmediatePropagation();},true);
+/* SELECTION TOOLS AND "SELECT BY" FILTER ----------------------------------------
+   Selection always works with item IDs, not DOM elements. That keeps selection
+   valid while the page is redrawn and lets a group behave as one selectable
+   unit. The Select-by dialog gets candidates from the current document state,
+   then hands matching IDs to the shared selection-core module. */
 function togglePageItemSelection(id){const item=state.annotations.find(annotation=>annotation.id===id&&isAddedPageObject(annotation));if(!item)return;const current=state.selectedIds.length?state.selectedIds:state.selectedId?[state.selectedId]:[];state.selectedId=null;state.selectedIds=toggleGroupedSelectionIds(state.annotations.filter(isAddedPageObject),current,id);showMultiSelection();}
 function selectAllPageObjects(){const ids=pageAnnotations().filter(isAddedPageObject).map(item=>item.id);state.selectedId=null;state.selectedIds=ids;showMultiSelection();toast(ids.length?`${ids.length} items selected on this page.`:"There are no added items on this page.");}
 function selectionFilterPageItems(){const pageId=$("selectionFilterPage").value||currentPageDescriptor()?.id;return state.annotations.filter(item=>item.pageId===pageId&&!item.deleted&&isAddedPageObject(item)&&isAnnotationVisible(item));}
@@ -364,17 +599,17 @@ function setSelectionFilterColorMenuOpen(open){const menu=$("selectionFilterColo
 function populateSelectionFilterColors(){const select=$("selectionFilterColor"),menu=$("selectionFilterColorMenu"),previous=select.value,colors=selectionFilterColors(selectionFilterPageItems());select.innerHTML="";menu.innerHTML="";const addChoice=(color,label)=>{const option=document.createElement("option");option.value=color;option.textContent=label;select.append(option);const choice=document.createElement("button"),swatch=document.createElement("span"),text=document.createElement("span");choice.type="button";choice.dataset.color=color;choice.setAttribute("role","option");swatch.className=`selection-filter-option-swatch ${color?"":"any"}`;swatch.style.setProperty("--selection-option-color",color||"transparent");text.textContent=label;choice.append(swatch,text);menu.append(choice);};addChoice("","Any colour");for(const color of colors)addChoice(color,color.toUpperCase());select.value=[...select.options].some(option=>option.value===previous)?previous:"";syncSelectionFilterColorPicker();setSelectionFilterColorMenuOpen(false);}
 function updateSelectionFilterSummary(){const matches=selectionFilterMatches(),count=matches.length,color=$("selectionFilterColor").value,swatch=$("selectionFilterSwatch");$("selectionFilterCount").textContent=`${count} ${count===1?"item matches":"items match"}`;swatch.hidden=!color;swatch.style.setProperty("--selection-color",color||"transparent");$("addSelectionFilter").disabled=!count;$("removeSelectionFilter").disabled=!count;return matches;}
 function openSelectionFilter(){if(!state.pdf){toast("Open a PDF first.");return;}if(state.tool!=="select")setTool("select");populateSelectionFilterTypes();populateSelectionFilterPages();populateSelectionFilterLayers();populateSelectionFilterColors();updateSelectionFilterSummary();if(!$("selectionFilterDialog").open)$("selectionFilterDialog").showModal();$("selectionFilterType").focus();}
-function updateFormsButton(){const button=document.querySelector('[data-tool="forms"]');if(!button)return;const summary=formFieldSummary(state.formFields);button.disabled=!state.pdf;button.title=state.pdf?`${summary} Press F to enter Fill forms mode.`:"Open a PDF before filling forms.";}
+/* FORM FIELDS --------------------------------------------------------------------
+   Native PDF form fields are read from the opened PDF. Users can also add
+   manual text/checkbox fields. Both are normalized into `state.formFields`,
+   so rendering and export can use one consistent representation. */
+function updateFormsButton(){const button=$("formsButton"),menuButton=$("formMenuButton");if(!button||!menuButton)return;const summary=formFieldSummary(state.formFields),disabled=!state.pdf;button.disabled=disabled;menuButton.disabled=disabled;button.title=state.pdf?`${summary} Press F to enter Form mode.`:"Open a PDF before using Form mode.";menuButton.title=state.pdf?"Choose a manual form field tool":"Open a PDF before choosing a manual form field tool.";}
 function activateFormsTool(){if(!state.pdf){toast("Open a PDF before filling forms.");return;}setTool("forms");const summary=formFieldSummary(state.formFields);toast(`${summary} Manual tool: ${manualFormTypeLabel()}. Double-click blank page area to place.`);}
 function manualFormTypeLabel(type=manualFormFieldType){return type==="checkbox"?"Checkbox":"Text field";}
 function addManualFormField(point){const descriptor=currentPageDescriptor();if(!descriptor)return null;const factor=state.scale*1.25,pageWidth=els.shell.clientWidth/factor,pageHeight=els.shell.clientHeight/factor,isCheckbox=manualFormFieldType==="checkbox",width=isCheckbox?18:Math.min(180,Math.max(70,pageWidth-point.x-12)),height=isCheckbox?18:24,x=Math.max(0,Math.min(point.x,pageWidth-width)),y=Math.max(0,Math.min(point.y,pageHeight-height)),count=state.formFields.filter(field=>field.manual).length+1,field={id:`manual-field-${crypto.randomUUID()}`,name:`Manual field ${count}`,type:isCheckbox?"checkbox":"text",value:isCheckbox?false:"",dirty:true,manual:true,widgets:[{pageId:descriptor.id,bounds:{x,y,w:width,h:height}}]};state.formFields.push(field);markChanged();renderAnnotations();requestAnimationFrame(()=>els.ann.querySelector(`[data-field-id="${CSS.escape(field.id)}"]`)?.focus());toast(`${manualFormTypeLabel(field.type)} added.`);return field;}
-function positionFormToolMenu(){positionFloatingMenu($("formsButton"),$("formToolMenu"));}
-function setFormToolMenuOpen(open){const button=$("formsButton"),menu=$("formToolMenu"),next=Boolean(open&&state.pdf);menu.hidden=!next;button.setAttribute("aria-expanded",String(next));if(next){setSelectToolMenuOpen(false);$("measureMenu").hidden=true;$("markupMenu").hidden=true;$("stampMenu").hidden=true;setToolbarOverflowOpen(false);positionFormToolMenu();}}
-function closeFormToolMenu(){const menu=$("formToolMenu");if(menu)menu.hidden=true;$("formsButton")?.setAttribute("aria-expanded","false");}
-let formToolHoverCloseTimer=null;
-function scheduleFormToolMenuClose(){clearTimeout(formToolHoverCloseTimer);formToolHoverCloseTimer=setTimeout(closeFormToolMenu,220);}
-function clearFormToolMenuSelection(){for(const button of $("formToolMenu").querySelectorAll("[data-manual-form-type]")){button.classList.remove("selected");button.setAttribute("aria-pressed","false");}}
-function keepFormToolMenuOpen(){clearTimeout(formToolHoverCloseTimer);clearFormToolMenuSelection();setFormToolMenuOpen(true);}
+function positionFormToolMenu(){positionFloatingMenu($("formToolControl"),$("formToolMenu"));}
+function setFormToolMenuOpen(open){const button=$("formMenuButton"),menu=$("formToolMenu"),next=Boolean(open&&state.pdf);menu.hidden=!next;button.setAttribute("aria-expanded",String(next));if(next){syncFormToolMenu();setSelectToolMenuOpen(false);closeAllToolPalettes();positionFormToolMenu();setToolbarOverflowOpen(false);}}
+function closeFormToolMenu(){const menu=$("formToolMenu");if(menu)menu.hidden=true;$("formMenuButton")?.setAttribute("aria-expanded","false");}
 function syncFormToolMenu(){for(const button of $("formToolMenu").querySelectorAll("[data-manual-form-type]")){const selected=button.dataset.manualFormType===manualFormFieldType;button.classList.toggle("selected",selected);button.setAttribute("aria-pressed",String(selected));}}
 function manualFormFieldById(id){return state.formFields.find(field=>field.manual&&field.id===id);}
 function manualFormWidget(field){return field?.widgets?.[0]||null;}
@@ -388,6 +623,7 @@ function applySelectionFilter(mode){const pageId=$("selectionFilterPage").value|
 function syncAnnotationPropertyVisibility(annotation){
   const highlight=annotation.type==="highlight",textHighlight=highlight&&Boolean(annotation.rects?.length);
   for(const id of ["textValue","fontFamily","fontSize","autoFitTextBox","textStyleControls","horizontalAlign","verticalAlign","swatches","backgroundSwatches","borderWidth","borderSwatches"])$(id).closest("label").hidden=highlight;
+  $("lineHeightField").hidden=annotation.type!=="text";
   $("posX").closest("label").hidden=textHighlight;$("pageAlignment").closest("label").hidden=textHighlight;$("highlightColorField").hidden=!highlight;$("editNote").hidden=highlight;
 }
 function selectAnnotation(id) {
@@ -401,6 +637,7 @@ function selectAnnotation(id) {
   $("textValue").value=a.text||""; $("textValue").disabled=isHighlight;
   $("fontFamily").disabled=isHighlight; $("fontFamily").value=a.fontChoice&&a.fontChoice!=="original"?a.fontFamily:"original";
   $("fontSize").disabled=isHighlight; $("fontSize").value=a.fontSize||16; $("fontSizeValue").value=`${Math.round((a.fontSize||16)*10)/10} pt`;
+  const lineHeight=textLineHeight(a);$("lineHeight").disabled=a.type!=="text";$("lineHeight").value=lineHeight;$("lineHeightValue").value=`${lineHeight.toFixed(2)}×`;
   $("borderWidth").disabled=isHighlight;$("borderWidth").value=a.borderWidth||0;$("borderWidthValue").value=`${a.borderWidth||0} pt`;
   $("autoFitTextBox").disabled=isHighlight;$("autoFitTextBox").checked=Boolean(a.autoFit);
   $("borderSwatches").querySelectorAll("button").forEach(b=>{b.disabled=isHighlight;b.classList.toggle("selected",b.dataset.borderColor===(a.borderColor||"#15191f"));});
@@ -420,6 +657,12 @@ function selectAnnotation(id) {
 function syncStickyNoteControls(note){$("stickyNoteText").value=note.text||"";$("stickyNoteSubject").value=note.subject||"Sticky Note";$("stickyNoteAuthor").value=note.author||"";$("stickyNoteStatus").value=note.status||"None";$("stickyNoteColor").value=note.color||"#f6c344";$("stickyNoteColorValue").value=(note.color||"#f6c344").toUpperCase();syncPresetSelection("stickyNoteColorPresets",note.color||"#f6c344");$("stickyNoteX").value=Math.round(note.x*10)/10;$("stickyNoteY").value=Math.round(note.y*10)/10;$("stickyNoteCreated").textContent=stickyNoteDateLabel(note.createdDate);$("stickyNoteModified").textContent=stickyNoteDateLabel(note.modifiedDate);}
 function selectStickyNote(id){const note=state.annotations.find(item=>item.id===id&&item.type==="sticky-note");if(!note)return;if(setSingleSelection(id)){showMultiSelection();return;}renderAnnotations();$("inspector").classList.add("open");$("inspectorEmpty").hidden=true;$("inspectorContent").hidden=false;$("textProperties").hidden=true;$("stickyNoteProperties").hidden=false;$("measurementProperties").hidden=true;$("markupProperties").hidden=true;$("selectedVisibility").checked=isAnnotationVisible(note);syncSelectedLayer(note);syncStickyNoteControls(note);$("deleteButton").disabled=false;$("deleteButton").title="Delete Sticky Note";$("deleteButton").setAttribute("aria-label","Delete Sticky Note");updateItemClipboardButtons();updateItemDefaultControls(note);renderMarkupsList();}
 
+/* LOCAL RECOVERY -----------------------------------------------------------------
+   Recovery is an automatically saved browser-local snapshot of unfinished
+   work. It is deliberately separate from Export: recovery helps reopen the
+   current editing session, whereas Export creates a file the user can share.
+   Timers and generation numbers ensure an old asynchronous save cannot replace
+   a newer document after the user opens a different PDF. */
 function recoveryDocumentState(){return{pages:state.pages,page:state.page,scale:state.scale,layoutMode:state.layoutMode,annotations:state.annotations,bookmarks:state.bookmarks,layers:state.layers,formFields:state.formFields,measurementScales:state.measurementScales};}
 function currentRecoveryRecord(){return createRecoveryRecord({documentName:$("fileName").textContent,pageSources:state.pageSources,document:recoveryDocumentState()});}
 function formatRecoveryDate(value){try{return new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"short"}).format(new Date(value));}catch{return String(value||"");}}
@@ -461,6 +704,12 @@ async function removeSavedRecovery(){
   catch(error){console.error("Saved recovery data could not be deleted.",error);toast("Saved recovery data could not be deleted.");}
 }
 
+/* OPENING A PDF AND REDRAWING A PAGE ----------------------------------------------
+   `openPdf()` reads a file selected by the user. `loadPdf()` initializes all
+   document-specific state (including restored editable annotations), then
+   `renderPage()` builds the four visual layers described near `els` above.
+   Rendering uses a token so a slow earlier request cannot overwrite a newer
+   page/zoom request after it finishes. */
 async function openPdf(file) {
   const wasReady=recoveryReady;recoveryGeneration+=1;clearTimeout(recoverySaveTimer);recoverySaveTimer=null;recoveryReady=false;
   try { const bytes=new Uint8Array(await file.arrayBuffer()); await loadPdf(bytes,file.name);recoveryReady=true;scheduleRecoverySave(0); } catch(err) { recoveryReady=wasReady;console.error(err); toast("This PDF could not be opened."); }
@@ -498,6 +747,11 @@ async function renderPage({layoutAnchor=null,scrollIntoView=false}={}) {
     if(!layoutTrackingSuspensions)scheduleVisibleLayoutPageUpdate();
   }
 }
+/* PAGE LAYOUT AND THUMBNAILS -----------------------------------------------------
+   A page can be displayed alone, continuously, or beside a neighbour. The
+   layout helpers decide which descriptors are visible, while thumbnail helpers
+   draw smaller independent previews. They use separate render tokens so a
+   thumbnail refresh cannot interfere with the main document canvas. */
 function layoutPageIndexes(){
   if(state.layoutMode==="single")return[state.page-1];
   if(state.layoutMode==="side"){const start=(state.page-1)%2===0?state.page-1:state.page-2;return[start,start+1].filter(index=>index>=0&&index<state.pages.length);}
@@ -632,6 +886,14 @@ async function duplicateSelectedPages(){const copies=duplicatePages(state.pages,
 async function replaceSelectedPages(file){if(!file)return;const ids=pageToolTargetIds();if(!ids.length)return;try{const bytes=new Uint8Array(await file.arrayBuffer());let prepared={displayBytes:bytes.slice(),items:[]};try{prepared=await preparePdfForEditing(PDFLib,bytes);}catch(error){console.warn("Replacement annotations could not be restored.",error);}const pdf=await pdfjsLib.getDocument({data:prepared.displayBytes.slice()}).promise,sourceKey=`replacement-${crypto.randomUUID()}`,replacements=makeSourcePages(pdf.numPages).map(page=>({...page,sourceKey,rotation:0,imported:true,sourceName:file.name}));state.pageSources.set(sourceKey,{bytes:bytes.slice(),pdf,name:file.name});const result=replacePageRange(state.pages,state.annotations,ids,replacements);if(result.index<0)return;for(const removed of result.removed){delete state.measurementScales[removed.id];documentSearch.cache.delete(removed.id);removeBookmarksForPage(state.bookmarks,removed.id);}for(const item of prepared.items){const descriptor=replacements[item.pageIndex];if(!descriptor)continue;state.annotations.push({...item.annotation,id:typeof item.annotation.id==="string"&&item.annotation.id?item.annotation.id:crypto.randomUUID(),pageId:descriptor.id,visible:item.annotation.visible!==false});if(item.annotation.type==="measurement"&&item.annotation.measurementScale&&!state.measurementScales[descriptor.id])state.measurementScales[descriptor.id]={...item.annotation.measurementScale};}state.selectedPageIds=replacements.map(page=>page.id);syncPageNumbers();await refreshAfterPageTools(replacements[0]?.id);toast(`${result.removed.length} ${result.removed.length===1?"page":"pages"} replaced with ${replacements.length}.`);}catch(error){console.error(error);toast("The replacement PDF could not be opened.");}finally{$("replacePagesInput").value="";}}
 async function extractSelectedPages(){const ids=pageToolTargetIds();if(!ids.length)return;const numbers=ids.map(id=>state.pages.findIndex(page=>page.id===id)+1).filter(Boolean),stem=$("fileName").textContent.replace(/\.pdf$/i,""),name=`${stem}-pages-${numbers.join("-")}.pdf`,saveHandle=await chooseSaveLocation(name);if(saveHandle===null){toast("Extract canceled.");return;}try{toast("Preparing selected pages...");const output=await buildExportPdf("editable",ids);await savePdfLocally(output,name,saveHandle);toast(`${ids.length} ${ids.length===1?"page":"pages"} exported.`);}catch(error){console.error(error);toast("The selected pages could not be exported.");}}
 function startPageCrop(){const ids=pageToolTargetIds();if(ids.length!==1)return;const pageNumber=state.pages.findIndex(page=>page.id===ids[0])+1;if(pageNumber!==state.page){void goPage(pageNumber).then(startPageCrop);return;}setTool("page-crop");els.shell.classList.add("page-crop-active");$("cropPage").classList.add("active");toast("Drag a rectangle to keep that part of the page. Press Esc to cancel.");}
+/*
+  EDITABLE OVERLAYS
+
+  `renderAnnotations()` rebuilds the layers above the source PDF: text edits,
+  highlights, markup, measurements, Sticky Notes, form widgets, selection
+  handles, and temporary drawing affordances. These are DOM/SVG overlays rather
+  than pixels baked into the PDF canvas so users can still select and edit them.
+*/
 function renderAnnotations(){
   els.ann.innerHTML=""; const factor=state.scale*1.25;
   for(const a of pageAnnotations()){
@@ -658,7 +920,7 @@ function renderAnnotations(){
     if(a.type!=="highlight"){
       if(editing){el.value=a.text;el.setAttribute("aria-label","Edit PDF text");}else el.textContent=a.text;
       el.style.fontSize=`${a.fontSize*factor}px`; el.style.color=a.color; el.style.backgroundColor=a.backgroundColor||"transparent";
-      el.style.fontFamily=a.fontFamily||"Arial, Helvetica, sans-serif";el.style.fontWeight=a.fontWeight||"400";el.style.fontStyle=a.fontStyle||"normal";el.style.textDecoration=a.textUnderline?"underline":"none";
+      el.style.fontFamily=a.fontFamily||"Arial, Helvetica, sans-serif";el.style.fontWeight=a.fontWeight||"400";el.style.fontStyle=a.fontStyle||"normal";el.style.lineHeight=String(textLineHeight(a));el.style.textDecoration=a.textUnderline?"underline":"none";
       el.style.borderStyle="solid";el.style.borderWidth=`${editing?2:(a.borderWidth||0)*factor}px`;el.style.borderColor=editing?"#2078b8":a.borderColor||"#15191f";
       applyTextPosition(el,a,editing);el.spellcheck=true;el.setAttribute("spellcheck","true");
       if(editing){el.oninput=()=>{a.text=el.value;if(a.autoFit){fitAnnotationToText(a);positionSelectedBox(a,factor);}$("textValue").value=a.text;markChanged();queueThumbnailRefresh(a.pageId);};el.onblur=()=>{a.text=el.value;markChanged();queueThumbnailRefresh(a.pageId);};el.onclick=e=>{e.stopPropagation();if(e.ctrlKey||e.metaKey){a.text=el.value;togglePageItemSelection(a.id);}};}
@@ -811,8 +1073,9 @@ function fitAnnotationToText(a){
   const paragraphs=(a.text||"").split(/\r?\n/),natural=Math.max(30,...paragraphs.map(line=>ctx.measureText(line||" ").width+padding));a.w=Math.min(maxW,natural);
   const usable=Math.max(10,a.w-padding);let lineCount=0;
   for(const paragraph of paragraphs){if(!paragraph){lineCount++;continue;}let line="";for(const word of paragraph.split(/\s+/)){const candidate=line?`${line} ${word}`:word;if(!line||ctx.measureText(candidate).width<=usable)line=candidate;else{lineCount++;line=word;}}if(line)lineCount++;}
-  a.h=Math.min(Math.max(12,lineCount*size*1.25+6+border*2),Math.max(12,pageH-a.y));
+  a.h=Math.min(Math.max(12,lineCount*size*textLineHeight(a)+6+border*2),Math.max(12,pageH-a.y));
 }
+function textLineHeight(annotation){return Math.max(1,Math.min(2.5,Number(annotation?.lineHeight)||1.25));}
 function positionSelectedBox(a,factor){const editor=els.ann.querySelector(`textarea[data-id="${a.id}"]`),move=els.ann.querySelector(".move-handle"),remove=els.ann.querySelector(".delete-handle"),resize=els.ann.querySelector(".resize-handle"),rotate=els.ann.querySelector(".rotation-box-handle"),center=rotationCenter(a),resizePoint=center?rotatePoint({x:a.x+a.w,y:a.y+a.h},center,a.rotation||0):{x:a.x+a.w,y:a.y+a.h},handle=rotationHandlePoint(a,24/factor);if(editor){editor.style.left=`${a.x*factor}px`;editor.style.top=`${a.y*factor}px`;editor.style.width=`${a.w*factor}px`;editor.style.height=`${a.h*factor}px`;editor.style.transform=`rotate(${normalizeRotation(a.rotation||0)}deg)`;}if(move){move.style.left=`${a.x*factor}px`;move.style.top=`${Math.max(0,a.y*factor-20)}px`;}if(remove){remove.style.left=`${a.x*factor+48}px`;remove.style.top=`${Math.max(0,a.y*factor-20)}px`;}if(resize){resize.style.left=`${resizePoint.x*factor-7}px`;resize.style.top=`${resizePoint.y*factor-7}px`;}if(rotate&&handle){rotate.style.left=`${handle.x*factor-6}px`;rotate.style.top=`${handle.y*factor-6}px`;rotate.style.transform=`rotate(${normalizeRotation(a.rotation||0)}deg)`;}syncGeometryControls(a);}
 let boxTransform=null;
 function startAreaHighlightMove(event,id){
@@ -854,7 +1117,12 @@ window.addEventListener("pointermove",e=>{
 });
 window.addEventListener("pointerup",()=>{if(boxTransform){const a=state.annotations.find(x=>x.id===boxTransform.id);boxTransform=null;markChanged();queueThumbnailRefresh(a?.pageId);}});
  async function goPage(n,{layoutAnchor=null,scrollIntoView=true}={}){if(!state.pdf)return;const nextPage=Math.max(1,Math.min(state.pages.length,n));if(nextPage===state.page){renderDocumentSearchHighlights();if(scrollIntoView&&state.layoutMode!=="single")scrollLayoutPageIntoView(nextPage);return;}clearSelection();state.page=nextPage;$("pageInput").value=state.page;$("prevPage").disabled=state.page<=1;$("nextPage").disabled=state.page>=state.pages.length;await renderPage({layoutAnchor,scrollIntoView});scheduleRecoverySave();}
-function addAnnotation(a){ snapshot(); const item={id:crypto.randomUUID(),page:state.page,pageId:currentPageDescriptor()?.id,layerId:null,layerName:"",rotation:0,color:"#15191f",highlightColor:state.highlightColor,backgroundColor:"transparent",borderWidth:0,borderColor:"#15191f",autoFit:false,fontSize:16,fontChoice:"original",fontFamily:"Arial, Helvetica, sans-serif",originalFontFamily:"Arial, Helvetica, sans-serif",fontWeight:"400",originalFontWeight:"400",fontStyle:"normal",originalFontStyle:"normal",textUnderline:false,textAlign:"left",verticalAlign:"top",...a};if(item.type!=="highlight")applyItemDefault(item,userPreferences);applyActiveChestTool(item);if(item.autoFit)fitAnnotationToText(item);state.annotations.push(item); markChanged();queueThumbnailRefresh(item.pageId); renderAnnotations(); selectAnnotation(item.id); return item.id; }
+/* TEXT AND HIGHLIGHT ANNOTATIONS -------------------------------------------------
+   New editable items begin with safe defaults, then receive any saved user
+   defaults and active Tool Chest style. The caller can override those values by
+   passing fields in `a`; the final object is stored in `state.annotations`.
+   Creation records one undo snapshot before anything visible is changed. */
+function addAnnotation(a){ snapshot(); const item={id:crypto.randomUUID(),page:state.page,pageId:currentPageDescriptor()?.id,layerId:null,layerName:"",rotation:0,color:"#15191f",highlightColor:state.highlightColor,backgroundColor:"transparent",borderWidth:0,borderColor:"#15191f",autoFit:false,fontSize:16,lineHeight:1.25,fontChoice:"original",fontFamily:"Arial, Helvetica, sans-serif",originalFontFamily:"Arial, Helvetica, sans-serif",fontWeight:"400",originalFontWeight:"400",fontStyle:"normal",originalFontStyle:"normal",textUnderline:false,textAlign:"left",verticalAlign:"top",...a};if(item.type!=="highlight")applyItemDefault(item,userPreferences);applyActiveChestTool(item);if(item.autoFit)fitAnnotationToText(item);state.annotations.push(item); markChanged();queueThumbnailRefresh(item.pageId); renderAnnotations(); selectAnnotation(item.id); return item.id; }
 function addHighlightBoxes(boxes){ const geometry=createHighlightGeometry(boxes);if(!geometry)return;snapshot();const item={id:crypto.randomUUID(),page:state.page,pageId:currentPageDescriptor()?.id,layerId:null,layerName:"",color:"#15191f",highlightColor:state.highlightColor,fontSize:16,type:"highlight",...geometry};applyActiveChestTool(item);state.annotations.push(item);markChanged();queueThumbnailRefresh(item.pageId);selectAnnotation(item.id); }
 function focusSelectedText(id){ const el=els.ann.querySelector(`[data-id="${id}"]`); if(!el)return; el.focus(); if(el instanceof HTMLTextAreaElement){el.select();return;} const range=document.createRange(); range.selectNodeContents(el); const selection=window.getSelection(); selection.removeAllRanges(); selection.addRange(range); }
 function caretAtPoint(x,y){ if(document.caretPositionFromPoint){ const p=document.caretPositionFromPoint(x,y); return p?{node:p.offsetNode,offset:p.offset}:null; } const r=document.caretRangeFromPoint?.(x,y); return r?{node:r.startContainer,offset:r.startOffset}:null; }
@@ -878,6 +1146,10 @@ function selectedTextBoxes(range,pageRect,factor){
 function currentDrawingScale(pageId=currentPageDescriptor()?.id){return pageId?state.measurementScales[pageId]:null;}
 function updateMeasurementScaleStatus(){const scale=currentDrawingScale(),status=$("measureScaleStatus");status.textContent=measurementScaleLabel(scale);}
 function scalePreference(){return userPreferences.measurementScale||createPreferences().measurementScale;}
+/* MEASUREMENT SCALES -------------------------------------------------------------
+   Measurements are stored in page coordinates plus a drawing scale. A scale
+   can be calibrated from two points or selected from a ratio preset; applying
+   it to a page optionally updates existing measurement annotations as well. */
 function updateScalePresetSummary(){const preference=scalePreference(),count=preference.customPresets.length,summary=$("scalePresetSummary");if(summary)summary.textContent=`Default: ${preference.unit}, ${preference.precision} decimal ${preference.precision===1?"place":"places"}. ${count} custom ${count===1?"preset":"presets"} saved.`;}
 function renderScalePresetOptions(selectedValue=""){
   const select=$("scalePreset"),preference=scalePreference(),standard=document.createElement("optgroup"),custom=document.createElement("optgroup");standard.label="Standard scales";custom.label="Saved scales";
@@ -901,6 +1173,11 @@ function applyDrawingScale(scale,pageIds,updateExisting=false){
   for(const pageId of pageIds)state.measurementScales[pageId]={...scale};
   if(updateExisting)for(const annotation of state.annotations)if(pageIds.includes(annotation.pageId)&&annotation.type==="measurement"&&!['calibration','angle','count'].includes(annotation.measureKind))annotation.measurementScale={...scale};
 }
+/* TOOLBAR MENUS AND RESPONSIVE OVERFLOW ------------------------------------------
+   Floating menus are measured after they are shown, then placed below their
+   button when there is room (or above it near the bottom of the window).
+   When the toolbar is too narrow, lower-priority controls move into one shared
+   overflow menu; placeholder comments remember their original order. */
 function positionFloatingMenu(button,menu){const rect=button.getBoundingClientRect(),gap=6,edge=10;menu.style.maxHeight=`${Math.max(120,window.innerHeight-edge*2)}px`;const width=menu.offsetWidth,height=menu.offsetHeight,left=Math.max(edge,Math.min(rect.left,window.innerWidth-width-edge)),roomBelow=window.innerHeight-rect.bottom-edge,roomAbove=rect.top-edge,openAbove=height>roomBelow&&roomAbove>roomBelow,available=Math.max(120,openAbove?roomAbove-gap:roomBelow-gap);menu.style.left=`${left}px`;menu.style.top=`${openAbove?Math.max(edge,rect.top-Math.min(height,available)-gap):rect.bottom+gap}px`;menu.style.maxHeight=`${available}px`;}
 const toolbarOverflowCandidates=[...document.querySelectorAll("[data-toolbar-overflow]")].map((element,order)=>{const placeholder=document.createComment(`toolbar-${element.id||order}`);element.before(placeholder);return{element,order,priority:Number(element.dataset.toolbarOverflow)||0,placeholder};});
 let toolbarOverflowFrame=0;
@@ -916,19 +1193,23 @@ $('toolbarOverflowMenu').onclick=event=>{event.stopPropagation();if(event.target
 new ResizeObserver(scheduleToolbarOverflowUpdate).observe(document.querySelector('.editor'));
 new MutationObserver(scheduleToolbarOverflowUpdate).observe($('highlightPalette'),{attributes:true,attributeFilter:['hidden']});
 requestAnimationFrame(updateToolbarOverflow);
-let selectToolHoverCloseTimer=null;
-function positionSelectToolMenu(){positionFloatingMenu($("selectButton"),$("selectToolMenu"));}
-function setSelectToolMenuOpen(open){const button=$("selectButton"),menu=$("selectToolMenu"),next=Boolean(open);menu.hidden=!next;button.setAttribute("aria-expanded",String(next));if(next){$("measureMenu").hidden=true;$("markupMenu").hidden=true;$("stampMenu").hidden=true;setToolbarOverflowOpen(false);positionSelectToolMenu();}}
-function closeSelectToolMenu(){const menu=$("selectToolMenu");if(menu)menu.hidden=true;$("selectButton")?.setAttribute("aria-expanded","false");}
-function scheduleSelectToolMenuClose(){clearTimeout(selectToolHoverCloseTimer);selectToolHoverCloseTimer=setTimeout(closeSelectToolMenu,220);}
-function keepSelectToolMenuOpen(){clearTimeout(selectToolHoverCloseTimer);setSelectToolMenuOpen(true);}
+function positionSelectToolMenu(){positionFloatingMenu($("selectToolControl"),$("selectToolMenu"));}
+function setSelectToolMenuOpen(open){const button=$("selectMenuButton"),menu=$("selectToolMenu"),next=Boolean(open);menu.hidden=!next;button.setAttribute("aria-expanded",String(next));if(next){syncSelectToolControl();closeFormToolMenu();closeAllToolPalettes();positionSelectToolMenu();setToolbarOverflowOpen(false);}}
+function closeSelectToolMenu(){const menu=$("selectToolMenu");if(menu)menu.hidden=true;$("selectMenuButton")?.setAttribute("aria-expanded","false");}
 function positionMeasureMenu(){positionFloatingMenu($("measureButton"),$("measureMenu"));}
-function toggleMeasureMenu(){const menu=$("measureMenu"),opening=menu.hidden;closeSelectToolMenu();closeFormToolMenu();$("markupMenu").hidden=true;$("stampMenu").hidden=true;if(opening){updateMeasurementScaleStatus();menu.hidden=false;positionMeasureMenu();}else menu.hidden=true;}
-const toolPaletteHoverTimers=new Map();
-function scheduleToolPaletteClose(menuId){clearTimeout(toolPaletteHoverTimers.get(menuId));toolPaletteHoverTimers.set(menuId,setTimeout(()=>$(menuId).hidden=true,220));}
-function keepToolPaletteOpen(buttonId,menuId,position,prepare=()=>{}){clearTimeout(toolPaletteHoverTimers.get(menuId));closeSelectToolMenu();closeFormToolMenu();for(const id of ["measureMenu","markupMenu","stampMenu"])if(id!==menuId)$(id).hidden=true;prepare();$(menuId).hidden=false;setToolbarOverflowOpen(false);position();}
-function bindToolPaletteHover(buttonId,menuId,position,prepare=()=>{}){const button=$(buttonId),menu=$(menuId),open=()=>keepToolPaletteOpen(buttonId,menuId,position,prepare),close=()=>scheduleToolPaletteClose(menuId);button.addEventListener("pointerenter",event=>{if(event.pointerType==="mouse")open();});button.addEventListener("pointerleave",event=>{if(event.pointerType==="mouse")close();});button.addEventListener("mouseenter",open);button.addEventListener("mouseleave",close);menu.addEventListener("pointerenter",event=>{if(event.pointerType==="mouse")open();});menu.addEventListener("pointerleave",event=>{if(event.pointerType==="mouse")close();});menu.addEventListener("mouseenter",open);menu.addEventListener("mouseleave",close);}
-function selectMeasurementTool(kind){const scaleRequired=!['calibrate','angle','count'].includes(kind);if(scaleRequired&&!currentDrawingScale()){setTool("measure-calibrate");toast("Set the drawing scale first.");}else setTool(`measure-${kind}`);$("measureMenu").hidden=true;}
+function positionMarkupMenu(){positionFloatingMenu($("markupButton"),$("markupMenu"));}
+function positionStampMenu(){positionFloatingMenu($("stampButton"),$("stampMenu"));}
+const toolPaletteBindings={measureMenu:{buttonId:"measureButton",position:positionMeasureMenu,prepare:updateMeasurementScaleStatus},markupMenu:{buttonId:"markupButton",position:positionMarkupMenu,prepare:()=>{}},stampMenu:{buttonId:"stampButton",position:positionStampMenu,prepare:renderStampMenu}};
+function closeToolPalette(menuId){const binding=toolPaletteBindings[menuId];if(!binding)return;$(menuId).hidden=true;$(binding.buttonId).setAttribute("aria-expanded","false");}
+function closeAllToolPalettes(except=""){for(const menuId of Object.keys(toolPaletteBindings))if(menuId!==except)closeToolPalette(menuId);}
+function setToolPaletteOpen(menuId,open){const binding=toolPaletteBindings[menuId];if(!binding)return;const next=Boolean(open);if(!next){closeToolPalette(menuId);return;}closeSelectToolMenu();closeFormToolMenu();closeAllToolPalettes(menuId);binding.prepare();$(menuId).hidden=false;$(binding.buttonId).setAttribute("aria-expanded","true");binding.position();setToolbarOverflowOpen(false);}
+function toggleToolPalette(menuId){setToolPaletteOpen(menuId,$(menuId).hidden);}
+function selectMeasurementTool(kind){const scaleRequired=!['calibrate','angle','count'].includes(kind);if(scaleRequired&&!currentDrawingScale()){setTool("measure-calibrate");toast("Set the drawing scale first.");}else setTool(`measure-${kind}`);closeToolPalette("measureMenu");}
+/* VECTOR SNAP AND MEASUREMENT DRAFTS ---------------------------------------------
+   PDF.js exposes vector drawing operations rather than ready-made snap points.
+   `ensureVectorSegments()` extracts and caches line segments once per page.
+   During a measurement draft, pointer coordinates are converted from browser
+   pixels back into page units before optional Shift-axis and vector snapping. */
 function updateSnapToggle(){const button=$("snapToContentButton");button.setAttribute("aria-pressed",String(state.snapToContent));button.classList.toggle("selected",state.snapToContent);button.title=state.snapToContent?"Turn off snap to PDF vector content":"Snap measurements to PDF vector content";}
 function updateSnapIndicator(snap){let indicator=els.draw.querySelector(".snap-indicator");if(!snap){indicator?.remove();return;}if(!indicator){indicator=document.createElement("span");indicator.setAttribute("aria-hidden","true");els.draw.append(indicator);}indicator.className=`snap-indicator snap-${snap.type}`;const factor=state.scale*1.25;indicator.style.left=`${snap.point.x*factor}px`;indicator.style.top=`${snap.point.y*factor}px`;}
 async function ensureVectorSegments(descriptor=currentPageDescriptor()){
@@ -952,6 +1233,13 @@ window.addEventListener("pointerup",()=>{if(!measurementPointDrag)return;const a
 function startMeasurementMove(event,id){if(state.tool!=="select"||event.button!==0||event.target.closest(".measurement-point"))return;if(formatPainter.active){event.preventDefault();event.stopPropagation();return;}if(startGroupMove(event,id))return;event.preventDefault();event.stopPropagation();const annotation=state.annotations.find(item=>item.id===id&&item.type==="measurement"&&item.measureKind!=="calibration");if(!annotation)return;if(blockLockedEdit(annotation)){selectMeasurement(id);return;}const wasSingle=state.selectedId===id&&state.selectedIds.length===1;setSingleSelection(id);measurementMove={id,pageId:annotation.pageId,start:measurementPointFromEvent(event),points:annotation.points.map(point=>({...point})),bounds:measurementBounds(annotation.points),moved:false};if(!wasSingle)selectMeasurement(id);}
 window.addEventListener("pointermove",event=>{if(!measurementMove)return;const annotation=state.annotations.find(item=>item.id===measurementMove.id);if(!annotation)return;const current=measurementPointFromEvent(event),raw={x:current.x-measurementMove.start.x,y:current.y-measurementMove.start.y};if(!measurementMove.moved&&Math.hypot(raw.x,raw.y)<.5)return;if(!measurementMove.moved){snapshot();measurementMove.moved=true;}const locked=constrainMoveDelta(raw.x,raw.y,event.shiftKey),factor=state.scale*1.25,pageW=els.shell.clientWidth/factor,pageH=els.shell.clientHeight/factor,dx=Math.max(-measurementMove.bounds.x,Math.min(pageW-measurementMove.bounds.x-measurementMove.bounds.w,locked.dx)),dy=Math.max(-measurementMove.bounds.y,Math.min(pageH-measurementMove.bounds.y-measurementMove.bounds.h,locked.dy));annotation.points=measurementMove.points.map(point=>({x:point.x+dx,y:point.y+dy}));Object.assign(annotation,measurementBounds(annotation.points));renderAnnotations();});
 window.addEventListener("pointerup",()=>{if(!measurementMove)return;const{pageId,moved}=measurementMove;measurementMove=null;if(moved){markChanged();queueThumbnailRefresh(pageId);}});
+/*
+  Create one measurement annotation from page-coordinate points. Bounds are
+  derived rather than trusted from the caller, which keeps selection, movement,
+  and export correct after a point is edited. Defaults and Tool Chest styles are
+  applied before `extra`, allowing a specific interaction (such as Count) to
+  supply its own calculated fields.
+*/
 function addMeasurement(kind,points,scale=currentDrawingScale(),extra={},recordHistory=true){const bounds=measurementBounds(points);if(recordHistory)snapshot();const annotation={id:crypto.randomUUID(),type:"measurement",measureKind:kind,points:points.map(point=>({...point})),measurementScale:scale?{...scale}:null,page:state.page,pageId:currentPageDescriptor()?.id,layerId:null,layerName:"",color:"#d04a3a",lineColor:"#d04a3a",lineWidth:1.6,labelColor:"#b33427",lineType:"solid",shadeColor:"#d04a3a",shadeOpacity:.13,hatchPattern:"none",areaFillEnabled:true,showPerimeterLength:false,showAreaValue:false,...bounds};applyItemDefault(annotation,userPreferences);applyActiveChestTool(annotation);Object.assign(annotation,extra);annotation.color=annotation.lineColor;state.annotations.push(annotation);markChanged();queueThumbnailRefresh(annotation.pageId);renderAnnotations();selectMeasurement(annotation.id);if(kind!=="calibration")offerLiveLegendHint();return annotation;}
 function finishMeasurementDraft(){
   if(!measurementDraft)return;const {kind,points}=measurementDraft,minPoints=kind==="polyline"?2:3;if(points.length<minPoints){toast(`Add at least ${minPoints} points.`);return;}
@@ -977,6 +1265,11 @@ function handleMeasurementClick(event){
   scheduleCursorToolHintAt(event.clientX,event.clientY);
 }
 els.shell.addEventListener("click",handleMeasurementClick,true);
+/* PAGE CROPPING AND SELECTION GESTURES -------------------------------------------
+   Crop uses temporary display-pixel coordinates for its on-screen rectangle,
+   then converts to page units when applying the crop. Rectangle and lasso
+   selection also collect a temporary gesture before asking selection-core for
+   matching item IDs; neither gesture creates a persistent annotation itself. */
 function cropPointer(event){const bounds=els.shell.getBoundingClientRect();return{x:Math.max(0,Math.min(bounds.width,event.clientX-bounds.left)),y:Math.max(0,Math.min(bounds.height,event.clientY-bounds.top))};}
 function drawPageCropDraft(){const draft=$("pageCropDraft");if(!draft||!pageCropDrag)return;const left=Math.min(pageCropDrag.start.x,pageCropDrag.end.x),top=Math.min(pageCropDrag.start.y,pageCropDrag.end.y),width=Math.abs(pageCropDrag.end.x-pageCropDrag.start.x),height=Math.abs(pageCropDrag.end.y-pageCropDrag.start.y);draft.style.left=`${left}px`;draft.style.top=`${top}px`;draft.style.width=`${width}px`;draft.style.height=`${height}px`;}
 els.shell.addEventListener("pointerdown",event=>{if(state.tool!=="page-crop"||event.button!==0)return;event.preventDefault();event.stopPropagation();const draft=document.createElement("div"),point=cropPointer(event);draft.id="pageCropDraft";draft.className="page-crop-draft";els.draw.append(draft);pageCropDrag={pointerId:event.pointerId,start:point,end:point};els.shell.setPointerCapture(event.pointerId);drawPageCropDraft();},true);
@@ -1085,6 +1378,12 @@ els.shell.addEventListener("dblclick",event=>{if(!state.tool.startsWith("measure
 els.shell.addEventListener("pointermove",event=>{if(!state.tool.startsWith("measure-"))return;const point=placementMeasurementPoint(measurementPointFromEvent(event),measurementDraft?.points||[],event.shiftKey);if(!measurementDraft)return;measurementDraft.hover=point;renderMeasurementDraft();});
 els.shell.addEventListener("pointerleave",()=>{if(!measurementPointDrag)updateSnapIndicator(null);});
 
+/* MARKUP, STICKY NOTES, AND STAMPS ------------------------------------------------
+   These tools begin as a pointer gesture or a preset, then create an editable
+   annotation object. A Sticky Note receives focus on the next animation frame
+   because its textarea does not exist until `renderAnnotations()` has rebuilt
+   the overlay. Polygon/freehand tools keep a separate temporary draft until
+   the user supplies enough points to finish the shape. */
 function addStickyNote(point){const descriptor=currentPageDescriptor();if(!descriptor)return null;snapshot();const note=makeStickyNote({id:crypto.randomUUID(),page:state.page,pageId:descriptor.id,x:point.x,y:point.y}),page=stickyNotePageBounds(state.scale*1.25);note.x=Math.max(0,Math.min(page.width-note.w,note.x-note.w/2));note.y=Math.max(0,Math.min(page.height-note.h,note.y-note.h/2));applyItemDefault(note,userPreferences);state.annotations.push(note);activeStickyNoteEditorId=note.id;stickyNoteEditorSnapshot=false;markChanged();queueThumbnailRefresh(note.pageId);selectStickyNote(note.id);requestAnimationFrame(()=>els.ann.querySelector(`.sticky-note-editor[data-id="${CSS.escape(note.id)}"] textarea`)?.focus());toast("Sticky Note placed. Add text, or click the page to close it.");return note.id;}
 
 function addMarkup(kind,points,geometry={}){if(points.length<2)return null;snapshot();const item=makeMarkup(kind,points,state.page,currentPageDescriptor()?.id,crypto.randomUUID());item.layerId=null;item.layerName="";applyItemDefault(item,userPreferences);applyActiveChestTool(item);Object.assign(item,geometry);state.annotations.push(item);markChanged();queueThumbnailRefresh(item.pageId);renderAnnotations();selectMarkup(item.id);renderMarkupsList();return item.id;}
@@ -1100,22 +1399,17 @@ els.shell.addEventListener("click",event=>{if(!suppressMarkupClick)return;suppre
 els.shell.addEventListener("click",event=>{if(state.tool!=="markup-polygon")return;event.preventDefault();event.stopPropagation();if(event.detail>1)return;const point=measurementPointFromEvent(event);if(!markupDraft)markupDraft={kind:"polygon",points:[],hover:null};markupDraft.points.push(constrainPointToAxis(markupDraft.points.at(-1),point,event.shiftKey));markupDraft.hover=null;renderMarkupDraft();scheduleCursorToolHintAt(event.clientX,event.clientY);},true);
 els.shell.addEventListener("dblclick",event=>{if(state.tool!=="markup-polygon")return;event.preventDefault();event.stopPropagation();finishMarkupDraft();},true);
 
-$("measureButton").onclick=event=>{event.stopPropagation();toggleMeasureMenu();};
-$("scalePresetButton").onclick=()=>{$("measureMenu").hidden=true;openMeasurementScaleDialog("preset");};
+$("measureButton").onclick=event=>{event.stopPropagation();toggleToolPalette("measureMenu");};
+$("scalePresetButton").onclick=()=>{closeToolPalette("measureMenu");openMeasurementScaleDialog("preset");};
 $("snapToContentButton").onclick=toggleSnapToContent;
 $("measureMenu").onclick=event=>{event.stopPropagation();const button=event.target.closest("[data-measure-tool]");if(button){activeToolChestTool=null;renderToolChest();selectMeasurementTool(button.dataset.measureTool);}};
-function positionMarkupMenu(){positionFloatingMenu($("markupButton"),$("markupMenu"));}
-function positionStampMenu(){positionFloatingMenu($("stampButton"),$("stampMenu"));}
-bindToolPaletteHover("measureButton","measureMenu",positionMeasureMenu,updateMeasurementScaleStatus);
-bindToolPaletteHover("markupButton","markupMenu",positionMarkupMenu);
-bindToolPaletteHover("stampButton","stampMenu",positionStampMenu,renderStampMenu);
-$('markupButton').onclick=event=>{event.stopPropagation();const menu=$("markupMenu"),opening=menu.hidden;closeSelectToolMenu();closeFormToolMenu();$("measureMenu").hidden=true;$("stampMenu").hidden=true;menu.hidden=!opening;if(opening)positionMarkupMenu();};
-$("markupMenu").onclick=event=>{event.stopPropagation();const button=event.target.closest("[data-markup-tool]");if(!button)return;activeToolChestTool=null;renderToolChest();setTool(`markup-${button.dataset.markupTool}`);$("markupMenu").hidden=true;};
-$('stampButton').onclick=event=>{event.stopPropagation();const menu=$("stampMenu"),opening=menu.hidden;closeSelectToolMenu();closeFormToolMenu();$("measureMenu").hidden=true;$("markupMenu").hidden=true;menu.hidden=!opening;if(opening){renderStampMenu();positionStampMenu();}};
+$('markupButton').onclick=event=>{event.stopPropagation();toggleToolPalette("markupMenu");};
+$("markupMenu").onclick=event=>{event.stopPropagation();const button=event.target.closest("[data-markup-tool]");if(!button)return;activeToolChestTool=null;renderToolChest();setTool(`markup-${button.dataset.markupTool}`);closeToolPalette("markupMenu");};
+$('stampButton').onclick=event=>{event.stopPropagation();toggleToolPalette("stampMenu");};
 $("customTextStampButton").onclick=event=>{event.stopPropagation();const value=window.prompt("Stamp text","STAMP")?.trim();if(!value)return;activateStampPreset(makeTextStampPreset(value));};
 $("customImageStampButton").onclick=event=>{event.stopPropagation();pendingStampImageAction="create";$("stampImageFileInput").click();};
 $("stampImageFileInput").onchange=event=>{const file=event.target.files?.[0];if(file)void useStampImageFile(file);};
-document.addEventListener("click",event=>{if(!event.target.closest("#selectToolMenu,#selectButton"))closeSelectToolMenu();if(!event.target.closest("#formToolMenu,#formsButton"))closeFormToolMenu();if(!event.target.closest("#measureMenu,#measureButton"))$("measureMenu").hidden=true;if(!event.target.closest("#markupMenu,#markupButton"))$("markupMenu").hidden=true;if(!event.target.closest("#stampMenu,#stampButton"))$("stampMenu").hidden=true;if(!event.target.closest("#toolbarOverflowMenu,#toolbarOverflowButton"))setToolbarOverflowOpen(false);});
+document.addEventListener("click",event=>{if(!event.target.closest("#selectToolMenu,#selectToolControl"))closeSelectToolMenu();if(!event.target.closest("#formToolMenu,#formToolControl"))closeFormToolMenu();if(!event.target.closest("#measureMenu,#measureButton"))closeToolPalette("measureMenu");if(!event.target.closest("#markupMenu,#markupButton"))closeToolPalette("markupMenu");if(!event.target.closest("#stampMenu,#stampButton"))closeToolPalette("stampMenu");if(!event.target.closest("#toolbarOverflowMenu,#toolbarOverflowButton"))setToolbarOverflowOpen(false);});
 window.addEventListener("resize",()=>{scheduleToolbarOverflowUpdate();if(!$("selectToolMenu").hidden)positionSelectToolMenu();if(!$("formToolMenu").hidden)positionFormToolMenu();if(!$("measureMenu").hidden)positionMeasureMenu();if(!$("markupMenu").hidden)positionMarkupMenu();if(!$("stampMenu").hidden)positionStampMenu();if(!$("toolbarOverflowMenu").hidden)positionFloatingMenu($("toolbarOverflowButton"),$("toolbarOverflowMenu"));});
 $("scalePreset").onchange=syncScalePresetFields;
 $("scaleRatio").oninput=()=>{$("scalePreset").value="manual";$("deleteScalePreset").disabled=true;};
@@ -1139,25 +1433,12 @@ els.shell.addEventListener("pointermove",e=>{ if(!drag)return; const r=els.shell
 els.shell.addEventListener("pointerup",e=>{ if(!drag)return; const r=els.shell.getBoundingClientRect(), x=e.clientX-r.left,y=e.clientY-r.top,factor=state.scale*1.25,w=Math.abs(x-drag.x),h=Math.abs(y-drag.y); $("draft")?.remove(); if(w>5&&h>5)addAnnotation({type:"highlight",x:Math.min(x,drag.x)/factor,y:Math.min(y,drag.y)/factor,w:w/factor,h:h/factor}); drag=null; });
 
 document.querySelectorAll(".tool").forEach(b=>{if(!["selectButton","formsButton","measureButton","markupButton","stampButton","selectionFilterButton"].includes(b.id))b.onclick=()=>{activeToolChestTool=null;renderToolChest();setTool(b.dataset.tool);};});
-$("selectButton").addEventListener("pointerenter",event=>{if(event.pointerType==="mouse")keepSelectToolMenuOpen();});
-$("selectButton").addEventListener("pointerleave",event=>{if(event.pointerType==="mouse")scheduleSelectToolMenuClose();});
-$("selectButton").onclick=event=>{event.preventDefault();event.stopPropagation();activeToolChestTool=null;renderToolChest();setTool("select");};
-$("selectToolMenu").onclick=event=>{event.stopPropagation();const button=event.target.closest("[data-tool]");if(!button)return;activeToolChestTool=null;renderToolChest();setTool(button.dataset.tool);};
-$("selectToolMenu").addEventListener("pointerenter",event=>{if(event.pointerType==="mouse")keepSelectToolMenuOpen();});
-$("selectToolMenu").addEventListener("pointerleave",event=>{if(event.pointerType==="mouse")scheduleSelectToolMenuClose();});
-let formToolLongPressTimer=null,suppressFormToolClick=false;
-$("formsButton").addEventListener("pointerdown",event=>{if(event.button!==0||!state.pdf)return;clearTimeout(formToolLongPressTimer);suppressFormToolClick=false;formToolLongPressTimer=setTimeout(()=>{suppressFormToolClick=true;syncFormToolMenu();setFormToolMenuOpen(true);},550);});
-$("formsButton").addEventListener("pointerenter",event=>{if(event.pointerType==="mouse"&&state.pdf)keepFormToolMenuOpen();});
-$("formsButton").addEventListener("pointerleave",event=>{if(event.pointerType==="mouse")scheduleFormToolMenuClose();});
-$("formsButton").addEventListener("mouseenter",()=>{if(state.pdf)keepFormToolMenuOpen();});
-$("formsButton").addEventListener("mouseleave",scheduleFormToolMenuClose);
-for(const eventName of ["pointerup","pointercancel","pointerleave"])$("formsButton").addEventListener(eventName,()=>clearTimeout(formToolLongPressTimer));
-$("formsButton").onclick=event=>{event.preventDefault();event.stopPropagation();if(suppressFormToolClick){suppressFormToolClick=false;return;}activeToolChestTool=null;renderToolChest();activateFormsTool();};
+$("selectButton").onclick=event=>{event.preventDefault();event.stopPropagation();activeToolChestTool=null;renderToolChest();setTool(selectedSelectionTool);};
+$("selectMenuButton").onclick=event=>{event.preventDefault();event.stopPropagation();setSelectToolMenuOpen($("selectToolMenu").hidden);};
+$("selectToolMenu").onclick=event=>{event.stopPropagation();const button=event.target.closest("[data-selection-tool]");if(!button)return;activeToolChestTool=null;renderToolChest();setTool(button.dataset.selectionTool);closeSelectToolMenu();};
+$("formsButton").onclick=event=>{event.preventDefault();event.stopPropagation();activeToolChestTool=null;renderToolChest();activateFormsTool();};
+$("formMenuButton").onclick=event=>{event.preventDefault();event.stopPropagation();setFormToolMenuOpen($("formToolMenu").hidden);};
 $("formToolMenu").onclick=event=>{event.stopPropagation();const button=event.target.closest("[data-manual-form-type]");if(!button)return;manualFormFieldType=button.dataset.manualFormType==="checkbox"?"checkbox":"text";syncFormToolMenu();setFormToolMenuOpen(false);activateFormsTool();toast(`${manualFormTypeLabel()} selected. Double-click blank page area to place.`);};
-$("formToolMenu").addEventListener("pointerenter",event=>{if(event.pointerType==="mouse")keepFormToolMenuOpen();});
-$("formToolMenu").addEventListener("pointerleave",event=>{if(event.pointerType==="mouse")scheduleFormToolMenuClose();});
-$("formToolMenu").addEventListener("mouseenter",keepFormToolMenuOpen);
-$("formToolMenu").addEventListener("mouseleave",scheduleFormToolMenuClose);
 $("selectionFilterButton").onclick=openSelectionFilter;
 $("openButton").onclick=$("emptyOpenButton").onclick=()=>$("fileInput").click(); $("fileInput").onchange=e=>e.target.files[0]&&openPdf(e.target.files[0]);
 $("insertPageButton").onclick=()=>state.pdf&&insertBlankPage();
@@ -1185,6 +1466,11 @@ function deleteAnnotation(id){const a=state.annotations.find(x=>x.id===id);if(!a
 function deleteSelectedControlPoint(){if(!selectedControlPoint)return false;const {type,id,index}=selectedControlPoint,item=state.annotations.find(annotation=>annotation.id===id),supported=type==="markup"?item?.type==="markup"&&item.markupKind==="polygon":type==="measurement"&&item?.type==="measurement"&&["area","perimeter"].includes(item.measureKind);if(!supported){selectedControlPoint=null;return false;}const points=removeControlPoint(item.points,index);if(!points){toast("A closed shape must have at least three points.");return true;}snapshot();item.points=points;Object.assign(item,item.type==="markup"?markupBounds(points):measurementBounds(points));selectedControlPoint=null;renderAnnotations();markChanged();queueThumbnailRefresh(item.pageId);toast("Control point removed.");return true;}
 function deleteSelectedItems(){const ids=state.selectedIds.length?[...state.selectedIds]:state.selectedId?[state.selectedId]:[];if(!ids.length)return;const locked=state.annotations.find(item=>ids.includes(item.id)&&isAnnotationLocked(item));if(locked){blockLockedEdit(locked);return;}if(ids.length===1){deleteAnnotation(ids[0]);return;}const pageIds=new Set(state.annotations.filter(item=>ids.includes(item.id)).map(item=>item.pageId));snapshot();state.annotations=state.annotations.filter(item=>!ids.includes(item.id));clearSelection();renderAnnotations();markChanged();for(const pageId of pageIds)queueThumbnailRefresh(pageId);toast(`${ids.length} selected items deleted.`);}
 $("deleteButton").onclick=deleteSelectedItems;
+/* CLIPBOARD AND FORMAT PAINTER ---------------------------------------------------
+   Copy uses a JSON clone so the clipboard cannot accidentally share nested
+   objects with the original annotation. Paste creates a new ID and page
+   placement. Format Painter is different: it copies compatible appearance
+   properties only, never the source item's position, content, or review data. */
 function copySelectedItem(){const a=state.annotations.find(item=>item.id===state.selectedId&&isCopyablePageItem(item));if(!a)return false;itemClipboard=JSON.parse(JSON.stringify(a));itemPasteSequence=0;updateItemClipboardButtons();toast(`${a.type==="measurement"?"Measurement":a.type==="highlight"?"Area highlight":a.type==="sticky-note"?"Sticky Note":"Markup"} copied.`);return true;}
 function pasteTargetPoint(){const page=els.shell.getBoundingClientRect(),viewport=$("canvasArea").getBoundingClientRect(),inside=lastDocumentPointer&&lastDocumentPointer.x>=page.left&&lastDocumentPointer.x<=page.right&&lastDocumentPointer.y>=page.top&&lastDocumentPointer.y<=page.bottom&&lastDocumentPointer.x>=viewport.left&&lastDocumentPointer.x<=viewport.right&&lastDocumentPointer.y>=viewport.top&&lastDocumentPointer.y<=viewport.bottom;if(inside)return measurementPointFromEvent({clientX:lastDocumentPointer.x,clientY:lastDocumentPointer.y});const left=Math.max(page.left,viewport.left),right=Math.min(page.right,viewport.right),top=Math.max(page.top,viewport.top),bottom=Math.min(page.bottom,viewport.bottom),clientX=right>left?(left+right)/2:(page.left+page.right)/2,clientY=bottom>top?(top+bottom)/2:(page.top+page.bottom)/2;return measurementPointFromEvent({clientX,clientY});}
 function pasteCopiedItem(atPointer=false,preserveOriginalLocation=false){if(!itemClipboard||!state.pdf)return false;if(state.tool!=="select")setTool("select");const factor=state.scale*1.25,pageSize={width:els.shell.clientWidth/factor,height:els.shell.clientHeight/factor};const sourceBounds=itemClipboard.type==="measurement"?measurementBounds(itemClipboard.points):itemClipboard.type==="markup"&&itemClipboard.markupKind==="callout"?calloutBounds(itemClipboard):itemClipboard.type==="markup"?markupBounds(itemClipboard.points):{x:itemClipboard.x||0,y:itemClipboard.y||0,w:itemClipboard.w||0,h:itemClipboard.h||0};const placement=preserveOriginalLocation?{anchor:{x:sourceBounds.x+sourceBounds.w/2,y:sourceBounds.y+sourceBounds.h/2}}:atPointer?{anchor:pasteTargetPoint()}:{offset:12*++itemPasteSequence};const item=copyPageItem(itemClipboard,{id:crypto.randomUUID(),page:state.page,pageId:currentPageDescriptor()?.id,pageSize,...placement});if(!item)return false;if(item.type==="measurement"){Object.assign(item,measurementBounds(item.points));item.measurementScale=currentDrawingScale()||item.measurementScale;if(item.measureKind==="count")item.countValue=pageAnnotations().filter(annotation=>annotation.type==="measurement"&&annotation.measureKind==="count").length+1;}if(canRotatePageItem(item))setPageItemRotation(item,item.rotation||0);snapshot();state.annotations.push(item);markChanged();queueThumbnailRefresh(item.pageId);renderAnnotations();item.type==="measurement"?selectMeasurement(item.id):["highlight","text"].includes(item.type)?selectAnnotation(item.id):item.type==="sticky-note"?selectStickyNote(item.id):selectMarkup(item.id);if(item.type==="measurement")offerLiveLegendHint();const pasteMessage=preserveOriginalLocation?" in the original location":atPointer?" at the mouse pointer":" next to the copied item";toast(`${item.type==="measurement"?"Measurement":item.type==="highlight"?"Area highlight":item.type==="text"?"Text box":item.type==="sticky-note"?"Sticky Note":"Markup"} pasted${pasteMessage}.`);return true;}
@@ -1197,6 +1483,7 @@ function applyFormatPainter(targetId){if(!formatPainter.active)return false;cons
 $("formatPainterButton").onclick=startFormatPainter;
 $("closeInspector").onclick=clearSelection;
 $("textValue").oninput=e=>updateSelected({text:e.target.value}); $("fontSize").oninput=e=>{ $("fontSizeValue").value=`${e.target.value} pt`;updateSelected({fontSize:Number(e.target.value)}); };
+$("lineHeight").oninput=e=>{const value=Number(e.target.value);$("lineHeightValue").value=`${value.toFixed(2)}×`;updateSelected({lineHeight:value});};
 $("borderWidth").oninput=e=>{$("borderWidthValue").value=`${e.target.value} pt`;updateSelected({borderWidth:Number(e.target.value)});};
 $("fontFamily").onchange=e=>{ const a=state.annotations.find(x=>x.id===state.selectedId); if(!a)return; if(e.target.value==="original")updateSelected({fontChoice:"original",fontFamily:a.originalFontFamily||"Arial, Helvetica, sans-serif",fontWeight:a.originalFontWeight||"400",fontStyle:a.originalFontStyle||"normal"});else updateSelected({fontChoice:e.target.value,fontFamily:e.target.value}); };
 function isBoldText(item){return Number.parseInt(item?.fontWeight,10)>=600||/bold/i.test(item?.fontWeight||"");}
@@ -1208,6 +1495,11 @@ function bindAlignment(id,property){ $(id).onclick=e=>{const button=e.target.clo
 bindAlignment("horizontalAlign","textAlign");bindAlignment("verticalAlign","verticalAlign");
 bindTextStyles("textStyleControls");
 $("pageAlignment").onclick=e=>{const button=e.target.closest("button");if(!button)return;alignSelectedToPage(button.dataset.pageAlign);};
+/* INSPECTOR EDITING, GEOMETRY, AND ROTATION -------------------------------------
+   Inspector controls edit the selected annotation object, redraw its overlay,
+   and refresh the thumbnail/recovery state. Geometry is in page units, not
+   CSS pixels; use the current scale only when translating a mouse position.
+   Rotation helpers also keep the rotated bounds inside the page. */
 function alignSelectedToPage(mode){const a=state.annotations.find(x=>x.id===state.selectedId);if(!a||blockLockedEdit(a))return;const factor=state.scale*1.25,pageSize={width:els.shell.clientWidth/factor,height:els.shell.clientHeight/factor},next=alignElementToPage(a,pageSize,mode),dx=next.x-a.x,dy=next.y-a.y;snapshot();a.x=next.x;a.y=next.y;if(a.type==="highlight"&&a.rects?.length)for(const rect of a.rects){rect.x+=dx;rect.y+=dy;}if(a.type==="sticky-note")touchStickyNote(a);renderAnnotations();if(a.type==="sticky-note")syncStickyNoteControls(a);else syncGeometryControls(a,a.type==="highlight"&&Boolean(a.rects?.length));markChanged();queueThumbnailRefresh(a.pageId);}
 function updateSelected(patch){ const a=state.annotations.find(x=>x.id===state.selectedId); if(!a||blockLockedEdit(a))return; Object.assign(a,patch);if(a.autoFit)fitAnnotationToText(a);renderAnnotations();syncGeometryControls(a,a.type==="highlight"&&Boolean(a.rects?.length));markChanged();queueThumbnailRefresh(a.pageId); }
 function updateSelectedMeasurement(patch){const a=state.annotations.find(annotation=>annotation.id===state.selectedId&&annotation.type==="measurement");if(!a||blockLockedEdit(a))return;Object.assign(a,patch);renderAnnotations();markChanged();queueThumbnailRefresh(a.pageId);}
@@ -1366,6 +1658,10 @@ $("btxToolChestFileInput").onchange=event=>{const file=event.target.files?.[0];e
 $("jsonToolChestFileInput").onchange=event=>{const file=event.target.files?.[0];event.target.value="";importToolChestFile(file,"json");};
 $("exportToolChestButton").onclick=()=>{if(!toolChest.length)return;downloadFile(exportToolChest(toolChest),"bluebeam-killer-tool-chest.json");toast("Tool Chest exported.");};
 renderLayers();renderToolChest();renderStampMenu();renderTakeoffSummary();updatePageTools();
+/* MARKUPS LIST -------------------------------------------------------------------
+   The Markups List is a view over all annotations, including hidden ones. It
+   can sort and group rows without altering the document itself; row actions
+   locate the real annotation by ID before changing visibility or selection. */
 function currentMarkupsRows(){return markupListRows(state.annotations,state.pages,item=>item.type==="measurement"?measurementLabelLines(item).join(" / "):"");}
 const markupsListState={sortKey:"page",sortDirection:"asc",groupKey:""};
 function setItemVisibility(id,visible){const item=state.annotations.find(annotation=>annotation.id===id);if(!item)return;item.visible=visible;if(item.pageId===currentPageDescriptor()?.id)renderAnnotations();markChanged();queueThumbnailRefresh(item.pageId);}
@@ -1395,6 +1691,11 @@ $("markupsVisibilityAll").onchange=event=>{const rows=currentMarkupsRows();for(c
 $("markupsGroupBy").onchange=event=>{markupsListState.groupKey=event.target.value;renderMarkupsList();};
 $("markupsTableHead").onclick=event=>{const button=event.target.closest("button[data-sort-key]");if(!button)return;const key=button.dataset.sortKey;if(markupsListState.sortKey===key)markupsListState.sortDirection=markupsListState.sortDirection==="asc"?"desc":"asc";else{markupsListState.sortKey=key;markupsListState.sortDirection="asc";}renderMarkupsList();};
 $("exportMarkupsCsv").onclick=()=>{const rows=currentMarkupsRows(),blob=new Blob([rowsToCsv(rows)],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`${$("fileName").textContent.replace(/\.pdf$/i,"")}-markups.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast("Markups and measurements saved as CSV.");};
+/* RESIZABLE PANELS AND PREFERENCES ------------------------------------------------
+   Panel sizes are bounded so dragging a divider cannot leave the document area
+   unusably small. Interface choices are saved in user preferences, while PDF
+   content stays in `state` and recovery. This distinction matters when adding
+   a new setting: decide whether it belongs to the person or to the document. */
 const panelSizeLimits={sidebar:{min:280,max:420},inspector:{min:210,max:460},markups:{min:120,max:520}};
 function setPanelSize(kind,value,persist=false){const limits=panelSizeLimits[kind],workspace=document.querySelector(".workspace"),editor=document.querySelector(".editor"),otherWidth=kind==="sidebar"?$("inspector").getBoundingClientRect().width:$("sidebar").getBoundingClientRect().width,dynamicMax=kind==="markups"?Math.max(limits.min,Math.min(limits.max,editor.clientHeight-274)):Math.max(limits.min,Math.min(limits.max,workspace.clientWidth-otherWidth-360)),size=Math.round(Math.max(limits.min,Math.min(dynamicMax,value)));if(kind==="sidebar")workspace.style.setProperty("--sidebar-width",`${size}px`);else if(kind==="inspector")workspace.style.setProperty("--inspector-width",`${size}px`);else editor.style.setProperty("--markups-height",`${size}px`);if(persist){userPreferences.interface[`${kind}Size`]=size;saveUserPreferences();}return size;}
 function setPanelCollapsed(kind,collapsed,persist=true){
@@ -1469,6 +1770,11 @@ function updateLayoutButtons(){$("pageLayoutControls").querySelectorAll("[data-l
 function setLayoutMode(mode){if(!["single","continuous","side","continuous-side"].includes(mode))return;clearSelection();state.layoutMode=mode;updateLayoutButtons();if(state.pdf){renderPage({scrollIntoView:mode!=="single"});scheduleRecoverySave();}}
 async function applyFitMode(mode){if(!state.pdf)return;const size=await getDescriptorPageSize(currentPageDescriptor()),area=$("canvasArea");state.scale=calculateFitScale(size,{width:area.clientWidth,height:area.clientHeight},state.layoutMode,mode);await renderPage();scheduleRecoverySave();}
 $("pageLayoutControls").onclick=e=>{const button=e.target.closest("[data-view-command]");if(!button)return;runShortcut(button.dataset.viewCommand);};
+/* KEYBOARD SHORTCUT DISPATCH -----------------------------------------------------
+   `shortcutCommand()` (imported near the top) converts a key event into a small
+   command string. This function is the command-to-action table. Keep shortcut
+   parsing in the shared module and feature behavior here, so shortcuts can be
+   tested without a browser and the UI has one place to execute actions. */
 function runShortcut(command){
   if(command==="select"||command==="lasso"||command==="highlight"||command==="insert"||command==="edit"){setTool(command);return;}
   if(command==="forms"){activateFormsTool();return;}
@@ -1502,6 +1808,12 @@ function runShortcut(command){
   if(command==="show-shortcuts"){openShortcutDialog();return;}
   const alignment=command.startsWith("align-")?command.slice(6):null;if(alignment)alignSelectedToPage(alignment);
 }
+/*
+  Global key handling first gives active text fields and dialogs a chance to
+  behave normally. It then handles Escape and in-progress drawing gestures
+  before dispatching a regular shortcut. This ordering prevents a shortcut from
+  firing while a user is typing text into an annotation or form control.
+*/
 document.addEventListener("keydown",e=>{
   if(keyboardMoveSession&&!e.key.startsWith("Arrow")&&!['Shift','Control','Alt','Meta'].includes(e.key))finishKeyboardMove();
   if(e.code==="Space"&&!spacePanBlocked(e.target)&&state.pdf){e.preventDefault();if(!e.repeat)setSpacePan(true);return;}
@@ -1515,7 +1827,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&markupDraft?.kind==="polygon"&&!e.target.matches("input,textarea,select")){e.preventDefault();finishMarkupDraft();return;}
   if(e.key==="Escape"){
     hideCursorToolHint();
-    $("measureMenu").hidden=true;$("markupMenu").hidden=true;$("stampMenu").hidden=true;
+    closeSelectToolMenu();closeFormToolMenu();closeAllToolPalettes();
     if(rotationDrag){e.preventDefault();cancelRotationDrag();scheduleCursorToolHintForTool();toast("Rotation canceled.");return;}
     if(groupMove){e.preventDefault();cancelGroupMove();scheduleCursorToolHintForTool();toast("Group move canceled.");return;}
     if(selectionRectangleDrag){e.preventDefault();suppressClickAfterCanceledSelection();cancelRectangleSelection();scheduleCursorToolHintForTool();toast("Selection rectangle canceled.");return;}
@@ -1536,6 +1848,11 @@ $("exportButton").onclick=()=>{if(!state.bytes){toast("Open a PDF first.");retur
 $("cancelExport").onclick=()=>$("exportDialog").close();
 $("exportDialog").onclick=event=>{if(event.target===$("exportDialog"))$("exportDialog").close();};
 $("exportChoices").onclick=async event=>{const button=event.target.closest("[data-export-mode]");if(!button)return;const mode=button.dataset.exportMode;$("exportDialog").close();try{const suffix=mode==="editable"?"-editable.pdf":"-edited.pdf",fileName=$("fileName").textContent.replace(/\.pdf$/i,suffix),saveHandle=await chooseSaveLocation(fileName);if(saveHandle===null){toast("Export canceled.");return;}toast(mode==="editable"?"Preparing editable PDF annotations...":"Preparing secure flattened export...");const output=await buildExportPdf(mode);await savePdfLocally(output,fileName,saveHandle);toast(mode==="editable"?"Editable PDF saved.":"Flattened PDF saved.");}catch(err){console.error(err);toast("The PDF could not be exported.");}};
+/* PDF EXPORT --------------------------------------------------------------------
+   Export creates a new PDF with pdf-lib. "Flattened" paints all visible work
+   into page content; "editable" prefers native PDF annotations where possible
+   and keeps Bluebeam Killer data for round-tripping. The source PDF is never
+   overwritten in memory—an export is always a newly built file. */
 async function buildExportPdf(mode="flattened",pageIds=null){
   const exportPages=pageIds?.length?state.pages.filter(page=>pageIds.includes(page.id)):state.pages,exportPageIds=new Set(exportPages.map(page=>page.id)),doc=await PDFLib.PDFDocument.create(),sourceDocuments=new Map(),sourceDocument=async descriptor=>{const key=descriptor.sourceKey||"primary";if(!sourceDocuments.has(key)){const source=sourceForDescriptor(descriptor),bytes=key==="primary"&&mode==="editable"&&state.formFields.length?await applyNativePdfFormValues(PDFLib,source.bytes,state.formFields):source.bytes.slice();sourceDocuments.set(key,PDFLib.PDFDocument.load(bytes));}return sourceDocuments.get(key);};
   const pageNumberById=new Map(exportPages.map((page,index)=>[page.id,index+1])),vectorAnnotations=state.annotations.filter(annotation=>exportPageIds.has(annotation.pageId)&&annotation.visible!==false&&isLayerPrintable(annotation,state.layers)&&(mode==="editable"||isLayerVisible(annotation,state.layers))).map(annotation=>({...annotation,page:pageNumberById.get(annotation.pageId)}));
@@ -1624,12 +1941,18 @@ function drawCanvasAnnotation(ctx,a,scale){
   if(a.backgroundColor&&a.backgroundColor!=="transparent"){ctx.fillStyle=a.backgroundColor;ctx.fillRect(x,y,w,h);}
   if((a.borderWidth||0)>0){ctx.strokeStyle=a.borderColor||"#15191f";ctx.lineWidth=a.borderWidth*scale;ctx.strokeRect(x,y,w,h);}
   ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
-  const size=(a.fontSize||16)*scale,lineHeight=size*1.2;ctx.font=`${a.fontStyle||"normal"} ${a.fontWeight||"400"} ${size}px ${a.fontFamily||"Arial, sans-serif"}`;ctx.textBaseline="top";ctx.fillStyle=a.color||"#15191f";
+  const size=(a.fontSize||16)*scale,lineHeight=size*textLineHeight(a);ctx.font=`${a.fontStyle||"normal"} ${a.fontWeight||"400"} ${size}px ${a.fontFamily||"Arial, sans-serif"}`;ctx.textBaseline="top";ctx.fillStyle=a.color||"#15191f";
   const lines=wrapTextForCanvas(a.text||"",ctx,Math.max(w,10)),contentHeight=lines.length*lineHeight,verticalFactor=a.verticalAlign==="middle"?.5:a.verticalAlign==="bottom"?1:0,firstY=y+Math.max(0,h-contentHeight)*verticalFactor,horizontalFactor=a.textAlign==="center"?.5:a.textAlign==="right"?1:0;
   lines.forEach((line,index)=>{const lineX=x+Math.max(0,w-ctx.measureText(line).width)*horizontalFactor,lineY=firstY+index*lineHeight;ctx.fillText(line,lineX,lineY);if(a.textUnderline)drawCanvasTextUnderline(ctx,line,lineX,lineY,size,"left");});ctx.restore();
 }
 function drawCanvasTextUnderline(ctx,text,x,y,fontSize,alignment="left"){const width=ctx.measureText(text).width,startX=alignment==="center"?x-width/2:alignment==="right"?x-width:x;ctx.save();ctx.setLineDash([]);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=Math.max(1,fontSize/16);ctx.beginPath();ctx.moveTo(startX,y+fontSize*1.03);ctx.lineTo(startX+width,y+fontSize*1.03);ctx.stroke();ctx.restore();}
 function wrapTextForCanvas(text,ctx,maxWidth){const lines=[];for(const paragraph of text.split(/\r?\n/)){if(!paragraph){lines.push("");continue;}let line="";for(const word of paragraph.split(/\s+/)){const candidate=line?`${line} ${word}`:word;if(!line||ctx.measureText(candidate).width<=maxWidth)line=candidate;else{lines.push(line);line=word;}}if(line)lines.push(line);}return lines.length?lines:[""];}
+/* PDF COORDINATE CONVERSION AND VECTOR DRAWING ----------------------------------
+   Browser overlays use display coordinates with the origin at the top-left.
+   PDF coordinates can have a crop box and rotation, so export passes every
+   point/rectangle through these helpers before asking pdf-lib to draw it.
+   The canvas helpers above render a preview; the vector helpers below create
+   the matching final PDF content. */
 function pdfPageGeometry(page){const crop=page.getCropBox(),rotation=page.getRotation()?.angle||0;return makePageGeometry({x:crop.x,y:crop.y,width:crop.width,height:crop.height,rotation});}
 function pdfBox(rect,geometry){const [left,bottom,right,top]=displayRectToPdfRect(rect,geometry);return{x:left,y:bottom,width:right-left,height:top-bottom};}
 function displayPdfPoint(point,geometry){return displayPointToPdf(point,geometry);}
@@ -1668,7 +1991,7 @@ function drawVectorStickyNote(page,note,geometry=pdfPageGeometry(page)){const co
 function drawVectorAnnotation(page,a,fonts,geometry=pdfPageGeometry(page),stampImage=null){
   if(a.deleted||a.visible===false)return;
   const center=rotationCenter(a),angle=normalizeRotation(a.rotation||0),pdfCenter=center?displayPdfPoint(center,geometry):null;if(pdfCenter&&angle){const radians=-angle*Math.PI/180,cosine=Math.cos(radians),sine=Math.sin(radians),translateX=pdfCenter.x-cosine*pdfCenter.x+sine*pdfCenter.y,translateY=pdfCenter.y-sine*pdfCenter.x-cosine*pdfCenter.y;page.pushOperators(PDFLib.pushGraphicsState(),PDFLib.concatTransformationMatrix(cosine,sine,-sine,cosine,translateX,translateY));}
-  try{if(a.type==="sticky-note")drawVectorStickyNote(page,a,geometry);else if(a.type==="measurement")drawVectorMeasurement(page,a,fonts[standardFontKey(a)],geometry);else if(a.type==="markup")drawVectorMarkup(page,a,fonts[standardFontKey(a)],geometry,stampImage);else if(a.type==="highlight"){const c=hexToRgb(a.highlightColor||"#ffd84d");for(const rect of a.rects?.length?a.rects:[a])page.drawRectangle({...pdfBox(rect,geometry),color:PDFLib.rgb(c.r,c.g,c.b),opacity:.38});}else{const box=pdfBox(a,geometry),w=a.w,h=a.h;if(a.backgroundColor&&a.backgroundColor!=="transparent"){const bg=hexToRgb(a.backgroundColor);page.drawRectangle({...box,color:PDFLib.rgb(bg.r,bg.g,bg.b)});}if((a.borderWidth||0)>0){const border=hexToRgb(a.borderColor||"#15191f");page.drawRectangle({...box,borderColor:PDFLib.rgb(border.r,border.g,border.b),borderWidth:a.borderWidth});}const c=hexToRgb(a.color),font=fonts[standardFontKey(a)],size=a.fontSize||16,lineHeight=size*1.2,lines=wrapTextForPdf(a.text||"",font,size,Math.max(w,10)),contentHeight=lines.length*lineHeight,verticalFactor=a.verticalAlign==="middle"?.5:a.verticalAlign==="bottom"?1:0,firstY=a.y+size+Math.max(0,h-contentHeight)*verticalFactor,horizontalFactor=a.textAlign==="center"?.5:a.textAlign==="right"?1:0,textColor=PDFLib.rgb(c.r,c.g,c.b);lines.forEach((line,index)=>{const lineWidth=font.widthOfTextAtSize(line,size),lineX=a.x+Math.max(0,w-lineWidth)*horizontalFactor,lineY=firstY+index*lineHeight;drawDisplayText(page,line,{x:lineX,y:lineY},{size,font,color:textColor},geometry);if(a.textUnderline)drawDisplayUnderline(page,{x:lineX,y:lineY+1.5},{x:lineX+lineWidth,y:lineY+1.5},{color:textColor,thickness:Math.max(.6,size/16)},geometry);});}}finally{if(pdfCenter&&angle)page.pushOperators(PDFLib.popGraphicsState());}
+  try{if(a.type==="sticky-note")drawVectorStickyNote(page,a,geometry);else if(a.type==="measurement")drawVectorMeasurement(page,a,fonts[standardFontKey(a)],geometry);else if(a.type==="markup")drawVectorMarkup(page,a,fonts[standardFontKey(a)],geometry,stampImage);else if(a.type==="highlight"){const c=hexToRgb(a.highlightColor||"#ffd84d");for(const rect of a.rects?.length?a.rects:[a])page.drawRectangle({...pdfBox(rect,geometry),color:PDFLib.rgb(c.r,c.g,c.b),opacity:.38});}else{const box=pdfBox(a,geometry),w=a.w,h=a.h;if(a.backgroundColor&&a.backgroundColor!=="transparent"){const bg=hexToRgb(a.backgroundColor);page.drawRectangle({...box,color:PDFLib.rgb(bg.r,bg.g,bg.b)});}if((a.borderWidth||0)>0){const border=hexToRgb(a.borderColor||"#15191f");page.drawRectangle({...box,borderColor:PDFLib.rgb(border.r,border.g,border.b),borderWidth:a.borderWidth});}const c=hexToRgb(a.color),font=fonts[standardFontKey(a)],size=a.fontSize||16,lineHeight=size*textLineHeight(a),lines=wrapTextForPdf(a.text||"",font,size,Math.max(w,10)),contentHeight=lines.length*lineHeight,verticalFactor=a.verticalAlign==="middle"?.5:a.verticalAlign==="bottom"?1:0,firstY=a.y+size+Math.max(0,h-contentHeight)*verticalFactor,horizontalFactor=a.textAlign==="center"?.5:a.textAlign==="right"?1:0,textColor=PDFLib.rgb(c.r,c.g,c.b);lines.forEach((line,index)=>{const lineWidth=font.widthOfTextAtSize(line,size),lineX=a.x+Math.max(0,w-lineWidth)*horizontalFactor,lineY=firstY+index*lineHeight;drawDisplayText(page,line,{x:lineX,y:lineY},{size,font,color:textColor},geometry);if(a.textUnderline)drawDisplayUnderline(page,{x:lineX,y:lineY+1.5},{x:lineX+lineWidth,y:lineY+1.5},{color:textColor,thickness:Math.max(.6,size/16)},geometry);});}}finally{if(pdfCenter&&angle)page.pushOperators(PDFLib.popGraphicsState());}
 }
 async function chooseSaveLocation(fileName){if(typeof window.showSaveFilePicker!=="function")return undefined;try{return await window.showSaveFilePicker({suggestedName:fileName,types:[{description:"PDF document",accept:{"application/pdf":[".pdf"]}}]});}catch(err){if(err.name==="AbortError")return null;throw err;}}
 async function savePdfLocally(output,fileName,saveHandle){const blob=new Blob([output],{type:"application/pdf"});if(saveHandle){const writable=await saveHandle.createWritable();await writable.write(blob);await writable.close();return;}const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=fileName;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -1677,6 +2000,16 @@ function standardFontKey(a){ const family=(a.fontFamily||"").toLowerCase(),bold=
 function hexToRgb(hex){ const n=parseInt(hex.slice(1),16);return{r:((n>>16)&255)/255,g:((n>>8)&255)/255,b:(n&255)/255}; }
 function hexToCssRgba(hex,alpha){const c=hexToRgb(hex);return`rgba(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)},${alpha})`;}
 
+/*
+  FINAL LIFECYCLE HOOKS
+
+  Most setup above is eager because the module loads after the HTML. These two
+  hooks flush a pending debounced recovery save when the tab is hidden or the
+  page is left. Browser shutdown does not guarantee long asynchronous work, so
+  normal edits still schedule saves earlier; these handlers are a last chance,
+  not the primary persistence path. The final call checks for recoverable work
+  only after all dialog controls and handlers have been initialised.
+*/
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&recoverySaveTimer){clearTimeout(recoverySaveTimer);recoverySaveTimer=null;void saveCurrentRecovery();}});
 window.addEventListener("pagehide",()=>{if(recoverySaveTimer){clearTimeout(recoverySaveTimer);recoverySaveTimer=null;void saveCurrentRecovery();}});
 void refreshAvailableRecovery({prompt:true});

@@ -6,17 +6,17 @@ export const PREFERENCES_KEY="bluebeam-killer-preferences";
 export const PREFERENCES_VERSION=1;
 export const MARKUP_DEFAULT_TYPES=["line","arrow","rectangle","ellipse","cloud","polygon","freehand","flag","callout","legend","stamp"];
 export const MEASUREMENT_DEFAULT_TYPES=["length","polyline","area","perimeter","diameter","angle","count"];
-export const TEXT_FORMAT_KEYS=["fontFamily","fontChoice","fontSize","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit","rotation"];
+export const TEXT_FORMAT_KEYS=["fontFamily","fontChoice","fontSize","lineHeight","fontWeight","fontStyle","textUnderline","textAlign","verticalAlign","color","backgroundColor","borderWidth","borderColor","autoFit","rotation"];
 export const HIGHLIGHT_FORMAT_KEYS=["highlightColor"];
 
-const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),statuses=new Set(["None","Accepted","Rejected","Completed","Cancelled"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor","highlightColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","borderWidth","lineWidth","shadeOpacity","rotation"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength","showAreaValue"]);
+const themes=new Set(["light","dark","system"]),layouts=new Set(["single","continuous","side","continuous-side"]),lineTypes=new Set(["solid","dashed","dotted","centerline"]),arrowTypes=new Set(["none","open","closed","filled","circle","square","diamond"]),alignments=new Set(["left","center","right"]),verticalAlignments=new Set(["top","middle","bottom"]),hatches=new Set(["none","diagonal","crosshatch","horizontal","vertical"]),statuses=new Set(["None","Accepted","Rejected","Completed","Cancelled"]),colors=new Set(["strokeColor","fillColor","textColor","color","backgroundColor","borderColor","lineColor","labelColor","shadeColor","highlightColor"]),numbers=new Set(["strokeWidth","fillOpacity","fontSize","lineHeight","borderWidth","lineWidth","shadeOpacity","rotation"]),booleans=new Set(["textUnderline","showFlagText","autoFit","areaFillEnabled","showPerimeterLength","showAreaValue"]);
 
 export function createPreferences(){return{version:PREFERENCES_VERSION,theme:"system",pageLayout:"single",snapToContent:false,cursorHints:true,textDefaults:{},highlightDefaults:{},markupDefaults:{},measurementDefaults:{},measurementScale:sanitizeMeasurementScalePreferences(),stickyNoteDefaults:{},interface:{sidebarSize:280,inspectorSize:null,markupsSize:null,inspectorCollapsed:false,markupsCollapsed:false,liveLegendHintShown:false}};}
 
 function safeNumber(value,min,max){const number=Number(value);return Number.isFinite(number)?Math.max(min,Math.min(max,number)):null;}
 function safeStyleValue(key,value){
   if(colors.has(key))return typeof value==="string"&&(/^(#[0-9a-f]{6}|transparent)$/i.test(value))?value:null;
-  if(numbers.has(key)){const ranges={strokeWidth:[0,10],fillOpacity:[0,1],fontSize:[8,48],borderWidth:[0,10],lineWidth:[.5,8],shadeOpacity:[0,1],rotation:[0,359]},range=ranges[key];return safeNumber(value,range[0],range[1]);}
+  if(numbers.has(key)){const ranges={strokeWidth:[0,10],fillOpacity:[0,1],fontSize:[8,48],lineHeight:[1,2.5],borderWidth:[0,10],lineWidth:[.5,8],shadeOpacity:[0,1],rotation:[0,359]},range=ranges[key];return safeNumber(value,range[0],range[1]);}
   if(booleans.has(key))return typeof value==="boolean"?value:null;
   if(key==="lineType")return lineTypes.has(value)?value:null;
   if(key==="startArrow"||key==="endArrow")return arrowTypes.has(value)?value:null;

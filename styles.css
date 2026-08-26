@@ -1,3 +1,35 @@
+/*
+  STYLESHEET MAP FOR NEW CONTRIBUTORS
+
+  This file is ordered roughly like the page: global tokens and shell, sidebar,
+  toolbar, document canvas/layers, inspector and dialogs, responsive rules, then
+  dark-theme overrides. Prefer the existing custom properties below for repeated
+  colours and shadows. A rule later in the file can intentionally override an
+  earlier rule when a layout becomes smaller or the dark theme is active.
+
+  CSS AND JAVASCRIPT CONTRACTS
+
+  Most class names describe reusable appearance, while IDs identify one unique
+  control that app.js manipulates. State classes such as `.active`, `.open`,
+  `.selected`, and `.in-toolbar-overflow` are applied at runtime; do not rename
+  or restyle them without checking the JavaScript that owns that state. The
+  global `[hidden]` rule intentionally wins over component display rules.
+
+  Layout uses three different sizing systems for different jobs:
+  - the workspace grid owns the resizable left, editor, and inspector columns;
+  - flexbox lays out toolbars and compact rows of controls;
+  - absolutely positioned layers share the PDF page's coordinate origin.
+  `min-width:0`, `min-height:0`, and local `overflow` declarations often look
+  redundant but prevent grid/flex children from expanding the whole viewport.
+
+  RESPONSIVE AND THEME CHECKLIST
+
+  Use an `@container` query when a component responds to the editor column after
+  a panel resize. Use a viewport `@media` query only for whole-window changes.
+  Add new light surfaces with existing colour variables where possible. If a
+  literal light colour is necessary, inspect the dark-theme block at the end and
+  add matching normal, hover, focus, disabled, and selected states there.
+*/
 :root { --ink:#171a1f; --muted:#6d737d; --line:#dfe2e6; --paper:#fff; --canvas:#eef0f2; --navy:#173f65; --navy-dark:#0e304f; --amber:#ffd84d; --shadow:0 14px 40px rgba(22,31,43,.14); }
 * { box-sizing:border-box; }
 [hidden] { display:none !important; }
@@ -5,6 +37,10 @@ html, body { margin:0; height:100%; overflow:hidden; }
 body { color:var(--ink); background:var(--canvas); font-family:"DM Sans",sans-serif; font-size:14px; }
 button, input, textarea { font:inherit; }
 button { color:inherit; }
+/* TOP APPLICATION BAR ------------------------------------------------------------
+   Grid creates three columns: brand, flexible document title, and actions.
+   `minmax(0, 1fr)` is important: it lets a long file name shrink and ellipsize
+   instead of forcing the viewport wider than the screen. */
 .topbar { width:100%; max-width:100vw; height:64px; overflow:hidden; display:grid; grid-template-columns:clamp(180px,16vw,232px) minmax(0,1fr) auto; align-items:center; border-bottom:1px solid var(--line); background:#fff; padding-right:18px; position:relative; z-index:5; }
 .brand { height:100%; min-width:0; display:flex; align-items:center; gap:9px; padding:0 14px; font-family:"Newsreader",serif; font-size:18px; font-weight:600; letter-spacing:-.3px; }
 .brand > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -28,6 +64,13 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .button.primary { color:#fff; background:var(--navy); border-color:var(--navy); }
 .button.primary:hover { background:var(--navy-dark); }
 .button.large { height:44px; padding:0 22px; }
+/*
+  THREE-COLUMN WORKSPACE AND SIDEBAR
+
+  The CSS variables hold user-resizable panel widths; app.js changes them while
+  a divider is dragged. `min-height:0` and `overflow:hidden` are deliberate:
+  they make the inner document area, not the browser page, own scrolling.
+*/
 .workspace { --sidebar-width:280px; --inspector-width:clamp(220px,18vw,250px); width:100%; max-width:100vw; height:calc(100vh - 64px); min-height:0; overflow:hidden; display:grid; grid-template-columns:var(--sidebar-width) minmax(0,1fr) var(--inspector-width); }
 .sidebar, .inspector { background:#f8f9fa; border-color:var(--line); overflow:auto; }
 .sidebar { position:relative; display:grid; grid-template-columns:44px minmax(0,1fr); border-right:1px solid var(--line); padding:0; overflow:hidden; }
@@ -159,6 +202,14 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .tool-chest-item strong,.tool-chest-item small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tool-chest-item strong { font-size:11px; }
 .tool-chest-item small { margin-top:2px; color:var(--muted); font-size:9px; text-transform:capitalize; }
+/*
+  EDITOR AND TOOLBAR
+
+  `container-type:inline-size` lets the toolbar respond to the width of the
+  editor column, rather than the full browser window. This matters when a
+  resizable sidebar or inspector changes the available space. The editor rows
+  are toolbar, flexible canvas area, and status bar (plus Markups List when open).
+*/
 .editor { container-type:inline-size; display:grid; min-width:0; overflow:hidden; grid-template-rows:54px minmax(0,1fr) 40px; }
 .editor.markups-open { grid-template-rows:54px minmax(180px,1fr) minmax(120px,var(--markups-height,220px)) 40px; }
 .editor.markups-open.markups-collapsed { grid-template-rows:54px minmax(180px,1fr) 18px 40px; }
@@ -167,10 +218,66 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .edit-toolbar-row { overflow:hidden; }
 .tool-group { display:flex; height:100%; align-items:center; gap:3px; }
 .tool { display:flex; align-items:center; gap:7px; height:36px; border:0; border-radius:6px; background:transparent; padding:0 10px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
-.tool[aria-haspopup="menu"]::after { content:""; width:0; height:0; margin-left:1px; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid currentColor; opacity:.72; }
 .tool span { font-weight:700; font-size:15px; }
+.tool .tool-label { font-size:inherit; font-weight:inherit; }
 .tool:hover { background:#f1f3f5; }
 .tool.active { color:var(--navy); background:#e7eff6; }
+.tool:disabled { opacity:.32; cursor:default; }
+/*
+  SPLIT-CONTROL FRAME (Select and Form)
+
+  The HTML contains two buttons inside `.split-tool`, but this rule makes them
+  look like one connected control. `display:flex` places the main action and
+  arrow side by side. `overflow:hidden` clips both children to the rounded
+  frame, which prevents the arrow's hover colour from spilling past a corner.
+
+  The frame is 36px high including its 1px top and bottom borders. Its child
+  buttons are therefore 34px high: 34px + 1px + 1px = 36px. Keep this relation
+  if changing the height, otherwise the two inner buttons will not sit neatly
+  inside the outline.
+
+  The border, very light background, and small shadow make the split control
+  distinct from the toolbar background. The transition only animates visual
+  colours/shadow; it deliberately does not animate dimensions, so interaction
+  never makes the toolbar shift.
+*/
+.split-tool { min-width:0; height:36px; display:flex; align-items:stretch; overflow:hidden; border:1px solid #becbd4; border-radius:7px; background:#f7f9fa; box-shadow:0 1px 1px rgba(23,40,54,.06); transition:border-color .15s,background .15s,box-shadow .15s; }
+.split-tool:hover { border-color:#98aab7; }
+.split-tool:has(> .tool.active) { border-color:#78a5c2; background:#e7eff6; box-shadow:0 0 0 1px rgba(54,117,157,.12); }
+/* `:has()` lets the parent react when either child is keyboard-focused. */
+.split-tool:has(> :focus-visible) { outline:2px solid #367fae; outline-offset:2px; }
+.split-tool > .tool { min-width:0; height:34px; border-radius:6px 0 0 6px; padding-right:7px; }
+.split-tool > .tool:hover:not(:disabled),.split-tool > .tool:focus-visible { background:#edf3f7; }
+.split-tool > .tool.active { background:transparent; }
+.split-tool > :focus-visible { outline:0; }
+/*
+  The 26px arrow hit area is deliberately wider than a decorative chevron.
+  The left border is the subtle divider between the two button actions. `grid`
+  plus `place-items:center` centres the CSS-drawn chevron without extra offsets.
+*/
+.split-tool-toggle { width:26px; min-width:26px; height:34px; display:grid; place-items:center; padding:0; border:0; border-left:1px solid #b8c6d0; border-radius:0 6px 6px 0; background:transparent; color:var(--ink); cursor:pointer; }
+.split-tool-chevron { width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid currentColor; opacity:.72; }
+.split-tool-toggle:hover:not(:disabled),.split-tool-toggle:focus-visible,.split-tool-toggle[aria-expanded="true"] { background:#e8eff4; color:var(--navy); }
+.split-tool > .tool.active + .split-tool-toggle { border-color:#a9bfce; color:var(--navy); background:transparent; }
+.split-tool > .tool:disabled + .split-tool-toggle,.split-tool-toggle:disabled { opacity:.32; cursor:default; }
+.split-tool:has(> .tool:disabled) { border-color:#d5dce1; background:#f3f5f6; box-shadow:none; }
+/*
+  FIXED WIDTHS FOR TEXT THAT CHANGES AT RUNTIME
+
+  JavaScript changes Select's label between "Select" and "Lasso", and changes
+  Markup/Measure labels to the active palette choice. `flex:0 0 <width>` means
+  "do not grow, do not shrink, always use this width". It prevents a text
+  change from reflowing the whole toolbar.
+
+  Select uses 108px so its wider 26px arrow still leaves a comfortably sized
+  main-button target. `min-width:0` and the overflow rules allow a truly long
+  future tool name to clip with an ellipsis rather than forcing horizontal
+  overflow. The full tool name remains available through its menu/tooltip.
+*/
+.toolbar-primary .dynamic-select-tool { width:108px; flex:0 0 108px; }
+.toolbar-primary .dynamic-select-tool > .tool { flex:1 1 auto; overflow:hidden; }
+.toolbar-primary .dynamic-mode-tool { width:102px; min-width:102px; flex:0 0 102px; overflow:hidden; padding-inline:4px; }
+.dynamic-select-tool .tool-label,.dynamic-mode-tool .tool-label { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .tool .highlight-icon { background:linear-gradient(transparent 58%,var(--amber) 58%); }
 .highlight-palette { display:flex; align-items:center; gap:5px; padding:0 7px; height:32px; border:1px solid var(--line); border-radius:6px; background:#fafbfc; }
 .highlight-palette span { margin-right:2px; color:var(--muted); font-size:9px; font-weight:700; text-transform:uppercase; }
@@ -183,6 +290,17 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .icon-button:hover:not(:disabled) { background:#f0f2f4; }
 .icon-button:disabled { opacity:.32; cursor:default; }
 .toolbar-spacer { min-width:8px; flex:1 1 auto; }
+/*
+  TOOLBAR OVERFLOW CONTRACT
+
+  app.js measures the toolbar using these real rendered widths, then moves the
+  lowest-priority eligible controls into the fixed-position menu. Keep ordinary
+  toolbar spacing stable: silently shrinking gaps or padding makes the toolbar
+  jump when a side panel opens and also makes JavaScript's fit decision harder
+  to understand. The overflow menu restyles the moved nodes; it does not clone
+  them, which means their IDs, event listeners, disabled state, and ARIA state
+  continue to work in either location.
+*/
 .toolbar-overflow-button { flex:0 0 34px; }
 .toolbar-overflow-menu { position:fixed; z-index:45; width:230px; max-height:calc(100vh - 20px); overflow:auto; gap:2px; padding:7px; border:1px solid #cbd2d9; border-radius:9px; background:#fff; box-shadow:0 16px 42px rgba(20,31,43,.24); }
 .toolbar-overflow-menu:not([hidden]) { display:grid; }
@@ -192,6 +310,8 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .toolbar-overflow-menu > .icon-button::after { content:attr(data-overflow-label); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .toolbar-overflow-menu > :is(.tool,.icon-button,.toolbar-snap):hover:not(:disabled) { background:#eef3f7; }
 .toolbar-overflow-menu > .highlight-palette { width:100%; height:auto; min-height:40px; flex-wrap:wrap; justify-content:flex-start; padding:7px; }
+.toolbar-overflow-menu > .split-tool { width:100%; }
+.toolbar-overflow-menu > .split-tool > .tool { flex:1 1 auto; justify-content:flex-start; font-size:11px; }
 .toolbar-overflow-menu .snap-label { display:inline; }
 .page-layout-control { min-width:0; display:flex; align-items:center; gap:3px; flex:1 1 auto; }
 .page-layout-action { min-width:34px; height:32px; display:flex; align-items:center; justify-content:center; gap:5px; padding:0 7px; border:1px solid transparent; border-radius:5px; background:transparent; color:#59616b; font-size:10px; font-weight:600; white-space:nowrap; cursor:pointer; }
@@ -298,15 +418,17 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .measure-menu button > span:nth-child(2) { min-width:0; display:flex; flex-direction:column; overflow:hidden; }
 .measure-menu button strong { font-size:10px; }
 .measure-menu button small { margin-top:2px; overflow:hidden; color:var(--muted); font-size:8px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
-.measure-shortcut { min-width:0; max-width:54px; overflow:hidden; border:0; padding:0; background:transparent; color:var(--muted); font:500 7px "DM Sans",sans-serif; text-overflow:ellipsis; white-space:nowrap; }
+.tool-shortcut { max-width:68px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .select-tool-menu,.form-tool-menu { position:fixed; z-index:40; width:min(230px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; gap:4px; padding:8px; border:1px solid #cbd2d9; border-radius:9px; background:#fff; box-shadow:0 16px 42px rgba(20,31,43,.24); }
 .select-tool-menu:not([hidden]),.form-tool-menu:not([hidden]) { display:grid; }
 .select-tool-menu button,.form-tool-menu button { width:100%; min-width:0; min-height:44px; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:7px; padding:7px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--ink); text-align:left; cursor:pointer; }
-.select-tool-menu button:hover,.form-tool-menu button:hover,.form-tool-menu button.selected { border-color:#c9d6e0; background:#eef4f8; color:var(--navy); }
-.select-tool-menu button > span:last-of-type,.form-tool-menu button > span:last-of-type { display:flex; flex-direction:column; min-width:0; }
+.select-tool-menu button { grid-template-columns:18px minmax(0,1fr) auto 12px; }
+.select-tool-menu button:hover,.select-tool-menu button.selected,.form-tool-menu button:hover,.form-tool-menu button.selected { border-color:#c9d6e0; background:#eef4f8; color:var(--navy); }
+.select-tool-menu button > span:nth-of-type(2),.form-tool-menu button > span:last-of-type { display:flex; flex-direction:column; min-width:0; }
 .select-tool-menu button strong,.form-tool-menu button strong { font-size:10px; }
 .select-tool-menu button small,.form-tool-menu button small { margin-top:2px; overflow:hidden; color:var(--muted); font-size:8px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
-.select-tool-menu kbd { color:var(--muted); font-size:8px; }
+.select-tool-menu .select-tool-check { display:block; color:var(--navy); font-size:12px; font-weight:700; opacity:0; }
+.select-tool-menu button[aria-checked="true"] .select-tool-check { opacity:1; }
 .markup-menu { position:fixed; z-index:40; width:min(330px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; grid-template-columns:1fr 1fr; gap:4px; padding:8px; border:1px solid #cbd2d9; border-radius:9px; background:#fff; box-shadow:0 16px 42px rgba(20,31,43,.24); }
 .markup-menu:not([hidden]) { display:grid; }
 .markup-menu-heading { grid-column:1 / -1; display:flex; justify-content:space-between; padding:4px 6px 8px; border-bottom:1px solid var(--line); }
@@ -374,6 +496,15 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .empty-state h1 { font-family:"Newsreader",serif; font-size:36px; letter-spacing:-.7px; margin:27px 0 7px; }
 .empty-state p { color:var(--muted); max-width:440px; margin:0 0 23px; line-height:1.6; }
 .empty-state > span { color:#8b919a; font-size:11px; margin-top:12px; }
+/*
+  PDF PAGE AND EDITABLE OVERLAY STACK
+
+  The stage owns scrolling and can arrange one, continuous, or side-by-side
+  page shells. Each `.page-shell` is `position:relative`, providing a common
+  coordinate origin for the PDF canvas and the three absolutely positioned
+  layers above it. The z-index order must remain: text (2), annotations (3),
+  temporary drawing/search overlays (4).
+*/
 .page-stage { min-width:100%; min-height:100%; padding:36px; }
 .page-stage.layout-continuous, .page-stage.layout-continuous-side { display:grid; align-content:start; justify-content:center; gap:24px; }
 .page-stage.layout-continuous { grid-template-columns:auto; }
@@ -489,6 +620,10 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .snap-indicator.snap-endpoint { border-radius:1px; }
 .snap-indicator.snap-edge { width:9px; height:9px; border-radius:1px; transform:translate(-50%,-50%) rotate(45deg); }
 .highlight-draft { position:absolute; background:rgba(255,216,77,.45); border:1px solid rgba(180,145,0,.3); }
+/* STATUS BAR, MARKUPS LIST, AND RESIZERS ----------------------------------------
+   Resizers are positioned over panel edges. Their visible affordance is drawn
+   with pseudo-elements so the actual separator stays a generous hit target for
+   pointer and keyboard users without adding extra markup. */
 .statusbar { min-width:0; background:#fff; border-top:1px solid var(--line); display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; padding:0 12px; color:var(--muted); font-size:11px; }
 .markups-panel { position:relative; min-width:0; min-height:0; border-top:1px solid var(--line); background:#fff; overflow:hidden; }
 .panel-resizer { position:absolute; z-index:20; touch-action:none; }
@@ -661,6 +796,15 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .icon-page-bottom { background:linear-gradient(currentColor,currentColor) center bottom 1px/100% 1px no-repeat; }
 .icon-page-bottom::after { width:12px; height:8px; left:4px; bottom:3px; }
 .edit-note { font-size:10px; line-height:1.5; color:var(--muted); background:#eef2f5; padding:10px; border-radius:6px; }
+/*
+  DIALOGS, FORMS, AND KEYCAPS
+
+  Native dialog elements already supply a modal backdrop and keyboard focus
+  management. These rules provide their shared visual treatment. `dvh` means
+  dynamic viewport height, which avoids a dialog being hidden behind a mobile
+  browser's address bar. The `kbd` rule below is intentionally global so every
+  shortcut shown in a palette, dialog, or help guide uses the same keycap.
+*/
 .shortcut-dialog { width:min(1120px,calc(100vw - 32px)); height:min(680px,calc(100dvh - 32px)); max-height:calc(100dvh - 32px); padding:0; overflow:hidden; border:1px solid #cfd5dc; border-radius:12px; color:var(--ink); background:#f8f9fa; box-shadow:0 24px 70px rgba(14,28,43,.28); }
 .shortcut-dialog[open] { display:grid; grid-template-rows:auto minmax(0,1fr); }
 .shortcut-dialog::backdrop { background:rgba(18,27,37,.46); backdrop-filter:blur(2px); }
@@ -741,21 +885,45 @@ html[data-theme="dark"] .theme-toggle .theme-sun { display:inline-block; }
 .shortcut-sections dl div:first-child { border-top:0; }
 .shortcut-sections dt { font-size:11px; }
 .shortcut-sections dd { margin:0; color:#555d66; font-size:10px; white-space:nowrap; }
-kbd { min-width:22px; display:inline-block; padding:2px 5px; border:1px solid #cbd1d8; border-bottom-width:2px; border-radius:4px; background:#f7f8f9; color:#313841; font:600 9px "DM Sans",sans-serif; text-align:center; }
+kbd { min-width:22px; box-sizing:border-box; display:inline-block; padding:2px 5px; border:1px solid #9babb7; border-radius:4px; background:#eef3f6; color:#17212a; font:700 9px/1.2 "DM Sans",sans-serif; text-align:center; }
 .toast { position:fixed; left:50%; bottom:58px; transform:translate(-50%,12px); background:#17212c; color:#fff; padding:10px 15px; border-radius:7px; font-size:12px; opacity:0; pointer-events:none; transition:.2s; z-index:20; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
 .mobile-only { display:none; }
+/*
+  RESPONSIVE RULES
+
+  Container queries react to the editor width (useful with resizable panels).
+  Viewport media queries handle whole-window changes, such as turning the
+  inspector into a floating panel and the sidebar into a mobile drawer. Keep
+  component-specific narrow rules close to their base rules where practical.
+*/
 @container (max-width:950px) { .page-layout-action .layout-label { display:none; } .page-layout-action { flex:1 1 34px; max-width:58px; padding:0 5px; } }
-@container (max-width:1400px) { .edit-toolbar-row { gap:6px; padding-inline:8px; } .toolbar-primary .tool, .toolbar-primary .toolbar-snap { padding-inline:7px; } }
-@container (max-width:820px) { .edit-toolbar-row > .toolbar-primary { min-width:0; overflow:hidden; } .edit-toolbar-row > .toolbar-primary .tool, .edit-toolbar-row > .toolbar-primary .toolbar-snap { width:38px; min-width:38px; padding:0 10px; gap:14px; overflow:hidden; font-size:0; } .edit-toolbar-row > .toolbar-primary .toolbar-snap .snap-label { display:none; } }
-@container (max-width:500px) { .edit-toolbar-row { gap:4px; padding-inline:6px; } }
-@media (max-width:1350px) and (min-width:1001px) { .edit-toolbar-row { padding-inline:8px; gap:8px; } .tool { padding:0 7px; } }
+/*
+  Keep the normal toolbar gaps and button padding when side panels resize the
+  editor. The JavaScript overflow manager moves lower-priority actions into the
+  More tools menu as room disappears, so opening the inspector does not make
+  the remaining controls squeeze together or appear to jump sideways.
+
+  At 820px the editor is genuinely narrow enough to need a compact layout. In
+  that case labels are hidden, but each visible button still receives the same
+  predictable width and padding instead of being progressively compressed.
+*/
+@container (max-width:820px) { .edit-toolbar-row > .toolbar-primary { min-width:0; overflow:hidden; } .edit-toolbar-row > .toolbar-primary .tool, .edit-toolbar-row > .toolbar-primary .toolbar-snap { width:38px; min-width:38px; padding:0 10px; gap:14px; overflow:hidden; font-size:0; } .edit-toolbar-row > .toolbar-primary .dynamic-mode-tool { flex-basis:38px; } .edit-toolbar-row > .toolbar-primary .dynamic-select-tool { width:66px; flex-basis:66px; } .edit-toolbar-row > .toolbar-primary .toolbar-snap .snap-label { display:none; } }
 @media (max-width:900px) { .shortcut-dialog { width:min(720px,calc(100vw - 24px)); height:min(680px,calc(100dvh - 24px)); max-height:calc(100dvh - 24px); } .shortcut-sections { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:1000px) { .workspace { grid-template-columns:280px minmax(0,1fr); } .panel-resizer-left,.panel-resizer-right { display:none; } .inspector { display:none; } .inspector.open { display:flex; flex-direction:column; position:fixed; z-index:12; top:126px; right:14px; bottom:54px; width:238px; height:auto; max-height:none; overflow:hidden; border:1px solid var(--line); border-radius:10px; box-shadow:0 16px 38px rgba(22,31,43,.2); background:#f8f9fa; } .topbar { grid-template-columns:280px minmax(0,1fr) auto; } .brand { padding:0 12px; } }
 @media (max-width:720px) { .topbar { grid-template-columns:1fr auto; padding-left:10px; } .brand { display:none; } .document-title { padding:0; } .document-title span { display:none; } .button.secondary { display:none; } .workspace { grid-template-columns:1fr; } .sidebar { position:fixed; left:0; top:64px; bottom:0; width:min(280px,calc(100vw - 48px)); z-index:10; transform:translateX(-100%); transition:.2s; box-shadow:8px 0 25px rgba(0,0,0,.12); } .sidebar.open { transform:translateX(0); } .mobile-only { display:grid; margin-right:6px; } .tool { width:38px; overflow:hidden; padding:0 10px; gap:14px; } .page-stage { padding:18px; } .statusbar > div:last-child { display:none; } .empty-state h1 { font-size:29px; } .shortcut-dialog { width:calc(100vw - 16px); height:calc(100dvh - 16px); max-height:calc(100dvh - 16px); } .shortcut-sections { grid-template-columns:1fr; } }
 @media (max-width:620px) { .settings-body { grid-template-columns:1fr; } .settings-storage-note { grid-column:1; } .selection-filter-grid { grid-template-columns:1fr; } }
 @media (max-width:720px) { .settings-dialog .button.secondary,.selection-filter-dialog .button.secondary,.item-default-controls .button.secondary { display:inline-flex; align-items:center; justify-content:center; } }
 
+/*
+  DARK THEME
+
+  app.js puts `data-theme="dark"` on the root <html> element. The first rule
+  swaps shared colour variables; later rules override surfaces that use literal
+  light colours. When adding a new light component, check whether it uses a
+  variable first, then add a paired override here only when one is needed for
+  readable contrast, borders, hover, focus, disabled, and selected states.
+*/
 html[data-theme="dark"] { color-scheme:dark; --ink:#e8edf2; --muted:#9aa6b2; --line:#35404b; --paper:#171c22; --canvas:#20262d; --navy:#73b5e6; --navy-dark:#4a97cf; --shadow:0 14px 40px rgba(0,0,0,.34); }
 html[data-theme="dark"] body { background:#20262d; }
 html[data-theme="dark"] .topbar,
@@ -810,10 +978,29 @@ html[data-theme="dark"] .theme-toggle:hover,
 html[data-theme="dark"] .zoom-controls button:hover,
 html[data-theme="dark"] .icon-button:hover:not(:disabled),
 html[data-theme="dark"] .tool:hover { background:#28313a; color:#8bc6ef; }
+/*
+  DARK THEME SPLIT-CONTROL COLOURS
+
+  These rules mirror the light-theme states above instead of relying on a
+  generic dark `.tool` rule. That keeps the frame, divider, active background,
+  disabled state, and keyboard-focus outline visibly connected in both themes.
+  Update the paired light and dark values together whenever this component's
+  interaction design changes.
+*/
+html[data-theme="dark"] .split-tool { border-color:#3a4b58; background:#1a232b; box-shadow:0 1px 1px rgba(0,0,0,.22); }
+html[data-theme="dark"] .split-tool:hover { border-color:#566b7a; }
+html[data-theme="dark"] .split-tool:has(> .tool.active) { border-color:#3f789c; background:#20384b; box-shadow:0 0 0 1px rgba(93,161,204,.12); }
+html[data-theme="dark"] .split-tool:has(> :focus-visible) { outline-color:#63add8; }
+html[data-theme="dark"] .split-tool > .tool:hover:not(:disabled),html[data-theme="dark"] .split-tool > .tool:focus-visible { background:#293742; }
+html[data-theme="dark"] .split-tool-toggle { border-color:#405462; color:#dbe3ea; }
+html[data-theme="dark"] .split-tool-toggle:hover:not(:disabled),html[data-theme="dark"] .split-tool-toggle:focus-visible,html[data-theme="dark"] .split-tool-toggle[aria-expanded="true"] { background:#2b3d49; color:#8bc6ef; }
+html[data-theme="dark"] .split-tool > .tool.active + .split-tool-toggle { border-color:#416d89; background:transparent; color:#8bc6ef; }
+html[data-theme="dark"] .split-tool:has(> .tool:disabled) { border-color:#303d47; background:#182027; box-shadow:none; }
 html[data-theme="dark"] .icon-button.format-painter-active { background:#203f53; color:#9bd2f4; box-shadow:inset 0 0 0 1px #507d99; }
 html[data-theme="dark"] .tool.active,
 html[data-theme="dark"] .page-layout-action.selected,
 html[data-theme="dark"] .page-layout-action[aria-pressed="true"] { border-color:#426986; background:#20384b; color:#8bc6ef; box-shadow:none; }
+html[data-theme="dark"] .split-tool > .tool.active { background:transparent; box-shadow:none; }
 html[data-theme="dark"] .page-layout-action { color:#aeb9c3; }
 html[data-theme="dark"] .page-layout-action:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
 html[data-theme="dark"] .snap-toggle { color:#aeb9c3; }
@@ -877,7 +1064,7 @@ html[data-theme="dark"] .stamp-menu,
 html[data-theme="dark"] .scale-dialog,
 html[data-theme="dark"] .export-dialog { border-color:#3b4651; background:#1b2128; }
 html[data-theme="dark"] .measure-menu button:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
-html[data-theme="dark"] .select-tool-menu button:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
+html[data-theme="dark"] .select-tool-menu button:hover,html[data-theme="dark"] .select-tool-menu button.selected { border-color:#475866; background:#26313a; color:#8bc6ef; }
 html[data-theme="dark"] .form-tool-menu button:hover,html[data-theme="dark"] .form-tool-menu button.selected { border-color:#475866; background:#26313a; color:#8bc6ef; }
 html[data-theme="dark"] .markup-menu button:hover { border-color:#475866; background:#26313a; color:#8bc6ef; }
 html[data-theme="dark"] .stamp-preset,html[data-theme="dark"] .stamp-menu-actions button { border-color:#475866; background:#202931; color:#e8eef3; }
@@ -925,7 +1112,7 @@ html[data-theme="dark"] .export-choices em { background:#203f53; color:#9bd2f4; 
 html[data-theme="dark"] .shortcut-sections dl div { border-color:#303a44; }
 html[data-theme="dark"] .shortcut-sections h3,
 html[data-theme="dark"] .shortcut-sections dd { color:#aeb8c2; }
-html[data-theme="dark"] kbd { border-color:#4a5662; background:#151a20; color:#dfe6ec; }
+html[data-theme="dark"] kbd { border-color:#526a7a; background:#111c25; color:#f2f7fb; }
 html[data-theme="dark"] .inspector-content { scrollbar-color:#6d7883 #252c34; }
 html[data-theme="dark"] .inspector-content::-webkit-scrollbar-track { background:#252c34; }
 html[data-theme="dark"] .inspector-content::-webkit-scrollbar-thumb { border-color:#252c34; background:#6d7883; }
