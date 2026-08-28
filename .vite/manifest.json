@@ -17,12 +17,7 @@
     ],
     "assets": [
       "assets/pdf.worker.min-yatZIOMy.mjs",
-      "assets/og-60gOXn7i.png",
       "assets/favicon-Chn-8nOM.svg"
     ]
-  },
-  "og.png": {
-    "file": "assets/og-60gOXn7i.png",
-    "src": "og.png"
   }
 }
