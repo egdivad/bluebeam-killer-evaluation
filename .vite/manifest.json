@@ -1,0 +1,28 @@
+{
+  "../node_modules/pdfjs-dist/build/pdf.worker.min.mjs": {
+    "file": "assets/pdf.worker.min-yatZIOMy.mjs",
+    "src": "../node_modules/pdfjs-dist/build/pdf.worker.min.mjs"
+  },
+  "favicon.svg": {
+    "file": "assets/favicon-Chn-8nOM.svg",
+    "src": "favicon.svg"
+  },
+  "index.html": {
+    "file": "assets/index-fD9jP9u9.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "css": [
+      "assets/index-BUxNtcsK.css"
+    ],
+    "assets": [
+      "assets/pdf.worker.min-yatZIOMy.mjs",
+      "assets/og-60gOXn7i.png",
+      "assets/favicon-Chn-8nOM.svg"
+    ]
+  },
+  "og.png": {
+    "file": "assets/og-60gOXn7i.png",
+    "src": "og.png"
+  }
+}

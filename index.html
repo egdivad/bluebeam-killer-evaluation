@@ -40,25 +40,22 @@
     <meta name="description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
     <meta property="og:title" content="Bluebeam Killer" />
     <meta property="og:description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
-    <meta property="og:image" content="og.png" />
+    <meta property="og:image" content="./assets/og-60gOXn7i.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Bluebeam Killer" />
     <meta name="twitter:description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
-    <meta name="twitter:image" content="og.png" />
+    <meta name="twitter:image" content="./assets/og-60gOXn7i.png" />
     <title>Bluebeam Killer</title>
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet" />
+    <link rel="icon" href="./assets/favicon-Chn-8nOM.svg" type="image/svg+xml" />
     <!--
       Apply the saved theme before the stylesheet paints. This tiny early script
       prevents a light-theme flash for people who prefer dark mode. app.js later
       validates and manages the same preference in more detail.
     -->
-    <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <link rel="stylesheet" href="styles.css?v=01a62d814802" />
-    <script src="vendor/pdf-lib.min.js"></script>
+    <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
+    <script type="module" crossorigin src="./assets/index-fD9jP9u9.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BUxNtcsK.css">
   </head>
   <body>
     <!--
@@ -669,10 +666,8 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <!--
       Load the module last so every element above exists before app.js performs
-      its initial ID lookups and event binding. The query-string version is a
-      cache key, not a separate file; increase it when runtime JavaScript changes
-      need to bypass a previously cached copy in deployed/offline testing.
-    -->
-    <script type="module" src="app.js?v=01a62d814802"></script>
+      its initial ID lookups and event binding. Vite follows this entry module,
+      bundles its imports, and gives production assets content-based cache names.
+    -->
   </body>
 </html>
