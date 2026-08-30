@@ -52,8 +52,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-fD9jP9u9.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BUxNtcsK.css">
+    <script type="module" crossorigin src="./assets/index-CcXPwBlc.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-zeuyWBNq.css">
   </head>
   <body>
     <!--
@@ -62,7 +62,9 @@
       This stays visible while the document scrolls. `fileName` and `saveState`
       are live status targets updated by app.js. The file input is hidden because
       styled buttons trigger it; keeping the native input preserves browser file
-      selection and accessibility behavior.
+      selection and accessibility behavior. Save overwrites directly only when
+      the browser gives app.js a writable file handle. Export always creates a
+      separately named file.
     -->
     <header class="topbar">
       <div class="brand"><span class="brand-mark">BK</span><span class="brand-name"><span class="brand-title">Bluebeam Killer</span><span class="build-badges"><small class="wip-badge" title="Beta build">Beta</small></span></span></div>
@@ -74,10 +76,23 @@
         <input id="fileInput" type="file" accept="application/pdf" hidden />
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Use dark mode" aria-pressed="false"><span class="ui-icon icon-moon theme-moon" aria-hidden="true"></span><span class="ui-icon icon-sun theme-sun" aria-hidden="true"></span></button>
         <button class="theme-toggle settings-toggle" id="settingsButton" type="button" aria-label="Open settings" title="Settings"><span class="ui-icon icon-settings" aria-hidden="true"></span></button>
-        <button class="button secondary" id="openButton" aria-keyshortcuts="Control+O">Open PDF</button>
-        <button class="button primary" id="exportButton" aria-keyshortcuts="Control+S Control+Shift+S">Export PDF</button>
+        <button class="button secondary" id="openButton" aria-keyshortcuts="Control+O" title="Open a PDF, or drag and drop a PDF anywhere in this window.">Open PDF</button>
+        <button class="button secondary" id="saveButton" aria-keyshortcuts="Control+S" disabled>Save</button>
+        <button class="button primary" id="exportButton" aria-keyshortcuts="Control+Shift+S">Export PDF</button>
       </div>
     </header>
+
+    <!--
+      DRAG-AND-DROP OVERLAY
+
+      Browser drag events can fire repeatedly while moving across child nodes.
+      app.js uses a counter to keep this single overlay visible until pointer
+      leaves browser window or PDF is dropped. It never captures normal mouse
+      work because hidden state removes it from layout and hit testing.
+    -->
+    <div class="pdf-drop-overlay" id="pdfDropOverlay" role="status" aria-live="polite" hidden>
+      <div><span class="ui-icon icon-cloud-upload" aria-hidden="true"></span><strong>Drop PDF now</strong><small>Release anywhere. Current document will be replaced.</small></div>
+    </div>
 
     <!--
       FLOATING TOOL PALETTES
@@ -332,7 +347,19 @@
             <div class="empty-badge">PDF</div>
             <h1>Review, mark up, and measure PDFs in your browser.</h1>
             <p>Edit text, add markups, measure drawings, manage pages, and export editable PDFs.</p>
-            <button class="button primary large" id="emptyOpenButton">Open a PDF</button>
+            <!--
+              Drag-and-drop is visually primary because users otherwise may
+              overlook it. The real button remains visually secondary because
+              it opens the native file picker when dragging is unavailable or
+              inconvenient. The surrounding box is not a button: clicking its
+              instruction text should never imply an action that cannot occur.
+            -->
+            <div class="empty-file-actions" role="group" aria-label="Open PDF">
+              <span class="empty-drop-icon ui-icon icon-cloud-upload" aria-hidden="true"></span>
+              <strong class="empty-drop-title">Drag &amp; drop PDF here</strong>
+              <span class="empty-drop-separator">or</span>
+              <button class="button empty-open-button" id="emptyOpenButton" title="Open a PDF, or drag and drop a PDF anywhere in this window.">Open PDF</button>
+            </div>
             <span>Everything stays on your device.</span>
           </div>
           <div class="page-stage" id="pageStage" hidden>
@@ -610,7 +637,7 @@
       <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <div class="shortcut-sections">
         <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd>, choose Select or Lasso from the split menu</dd></div><div><dt>Lasso selection</dt><dd><kbd>Shift+V</kbd></dd></div><div><dt>Select by properties</dt><dd><kbd>Ctrl+Shift+F</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div><div><dt>Form mode</dt><dd><kbd>F</kbd>, choose manual field tools from the split menu</dd></div></dl></section>
-        <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Search document</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
+        <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Save editable PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></dd></div><div><dt>Search document</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
         <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
         <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Sticky Note</dt><dd><kbd>N</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
         <section><h3>Measurements</h3><dl><div><dt>Undo last draft point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected area or perimeter point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Length</dt><dd><kbd>Shift+Alt+L</kbd></dd></div><div><dt>Polyline</dt><dd><kbd>Shift+Alt+Q</kbd></dd></div><div><dt>Area</dt><dd><kbd>Shift+Alt+A</kbd></dd></div><div><dt>Perimeter</dt><dd><kbd>Shift+Alt+P</kbd></dd></div><div><dt>Diameter</dt><dd><kbd>Shift+Alt+D</kbd></dd></div><div><dt>Angle</dt><dd><kbd>Shift+Alt+G</kbd></dd></div><div><dt>Count</dt><dd><kbd>Shift+Alt+C</kbd></dd></div></dl></section>
