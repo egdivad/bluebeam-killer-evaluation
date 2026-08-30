@@ -52,8 +52,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-CcXPwBlc.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-zeuyWBNq.css">
+    <script type="module" crossorigin src="./assets/index-yrq_y49q.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D8gnjJvN.css">
   </head>
   <body>
     <!--
@@ -231,7 +231,7 @@
         Markups List, and a status bar. Tool controls use IDs because app.js
         attaches event handlers directly to them and updates their state.
       -->
-      <section class="editor">
+      <section class="editor markups-collapsed">
         <nav class="toolbar" aria-label="PDF editing tools">
           <div class="edit-toolbar-row">
             <div class="tool-group toolbar-primary">
@@ -305,7 +305,7 @@
             <button class="icon-button" id="pasteItemButton" data-toolbar-overflow="50" data-overflow-label="Paste" title="Paste at mouse pointer: Ctrl+V&#10;Paste in the original location: Ctrl+Shift+V" aria-label="Paste at the mouse pointer with Ctrl+V, or paste in the original location with Ctrl+Shift+V" aria-keyshortcuts="Control+V Control+Shift+V" disabled><span class="ui-icon icon-paste" aria-hidden="true"></span></button>
             <button class="icon-button" id="formatPainterButton" data-toolbar-overflow="40" data-overflow-label="Format Painter" title="Copy the selected item format. Ctrl+Shift+C. Press Esc to stop." aria-label="Format Painter" aria-keyshortcuts="Control+Shift+C" aria-pressed="false" disabled><span class="ui-icon icon-paintbrush" aria-hidden="true"></span></button>
             <button class="icon-button" id="deleteButton" data-toolbar-overflow="30" data-overflow-label="Delete" title="Delete selected item (Delete)" aria-label="Delete selected item" aria-keyshortcuts="Delete" disabled><span class="ui-icon icon-trash" aria-hidden="true"></span></button>
-            <button class="icon-button" id="markupsListButton" data-toolbar-overflow="20" data-overflow-label="Markups List" title="Show Markups List" aria-label="Show Markups List" aria-pressed="false"><span class="ui-icon icon-list" aria-hidden="true"></span></button>
+            <button class="icon-button" id="markupsListButton" data-toolbar-overflow="20" data-overflow-label="Markups List" title="Show Markups List" aria-label="Show Markups List" aria-controls="markupsPanel" aria-pressed="false"><span class="ui-icon icon-list" aria-hidden="true"></span></button>
             <button class="icon-button keyboard-button" id="keyboardShortcutsButton" data-toolbar-overflow="10" data-overflow-label="Keyboard shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><span class="ui-icon icon-keyboard" aria-hidden="true"></span></button>
             </div>
             <div class="toolbar-spacer"></div>
@@ -373,9 +373,15 @@
           <div class="cursor-tool-hint" id="cursorToolHint" role="status" aria-live="polite" hidden></div>
         </div>
 
-        <!-- The Markups List is optional so it does not reduce page space until opened. -->
-        <section class="markups-panel" id="markupsPanel" aria-label="Markups List" hidden>
-          <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize or collapse Markups List" aria-orientation="horizontal" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
+        <!--
+          The collapsed Markups List keeps an 18-pixel edge visible. Users can
+          click that edge, or the toolbar button, to expand the list. The grip
+          appears only while the edge is hovered, focused, or dragged. It is
+          decorative; the surrounding separator owns pointer, keyboard, and
+          accessibility behaviour.
+        -->
+        <section class="markups-panel panel-collapsed" id="markupsPanel" aria-label="Markups List">
+          <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize, expand, or collapse Markups List" aria-orientation="horizontal" aria-expanded="false" title="Click to expand." tabindex="0"><span class="panel-resizer-grip" aria-hidden="true"></span></div>
           <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="layer">Layer</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="layer">Layer</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="author">Author</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th><th><button data-sort-key="created">Created</button></th><th><button data-sort-key="modified">Modified</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
         </section>
@@ -404,7 +410,7 @@
         Many groups start hidden because they only apply to certain item types.
       -->
       <aside class="inspector" id="inspector">
-        <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize or collapse properties panel" aria-orientation="vertical" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"></div>
+        <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize or collapse properties panel" aria-orientation="vertical" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"><span class="panel-resizer-grip" aria-hidden="true"></span></div>
         <div class="inspector-empty" id="inspectorEmpty"><span class="ui-icon icon-file" aria-hidden="true"></span><strong>No item selected</strong><p>Select an annotation to change its style.</p></div>
         <div class="inspector-content batch-properties" id="batchProperties" hidden>
           <div class="inspector-title"><span>Properties</span><button id="closeBatchInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
