@@ -52,8 +52,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-yrq_y49q.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D8gnjJvN.css">
+    <script type="module" crossorigin src="./assets/index-BtcboBo1.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BkSYXUUH.css">
   </head>
   <body>
     <!--
@@ -413,18 +413,21 @@
         <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize or collapse properties panel" aria-orientation="vertical" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"><span class="panel-resizer-grip" aria-hidden="true"></span></div>
         <div class="inspector-empty" id="inspectorEmpty"><span class="ui-icon icon-file" aria-hidden="true"></span><strong>No item selected</strong><p>Select an annotation to change its style.</p></div>
         <div class="inspector-content batch-properties" id="batchProperties" hidden>
-          <div class="inspector-title"><span>Properties</span><button id="closeBatchInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <div class="inspector-title"><span><strong>Multiple selection</strong><small>Properties</small></span><button id="closeBatchInspector" data-inspector-navigation aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <div class="batch-selection-summary"><strong id="batchSelectionCount">Multiple items selected</strong><small>Changes apply to compatible unlocked items.</small></div>
-          <section class="batch-property-group" id="batchGroupActions">
-            <h3>Group selected items</h3>
+          <details class="batch-property-group property-section" id="batchGroupActions">
+            <summary>Group selected items</summary>
+            <div class="property-section-body">
             <p class="batch-arrange-note">Grouped items select and move together.</p>
             <div class="batch-group-options" role="group" aria-label="Group selected items">
               <button id="groupSelectionButton" type="button" title="Group the selected items so they select and move together. Ctrl+G." aria-keyshortcuts="Control+G"><span class="ui-icon icon-group" aria-hidden="true"></span><span>Group</span></button>
               <button id="ungroupSelectionButton" type="button" title="Remove the selected items from their group. Ctrl+Shift+G." aria-keyshortcuts="Control+Shift+G"><span class="ui-icon icon-ungroup" aria-hidden="true"></span><span>Ungroup</span></button>
             </div>
-          </section>
-          <section class="batch-property-group" id="batchArrangeGroup">
-            <h3>Arrange selected items</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchArrangeGroup">
+            <summary>Arrange selected items</summary>
+            <div class="property-section-body">
             <p class="batch-arrange-note">Size commands use the first compatible selected item as the reference.</p>
             <div class="batch-arrange-options" role="group" aria-label="Arrange selected items">
               <button id="matchSelectionWidth" type="button" title="Make compatible items use the width of the first compatible selected item."><span class="ui-icon icon-match-width" aria-hidden="true"></span><span>Same width</span></button>
@@ -433,28 +436,36 @@
               <button id="distributeSelectionHorizontal" type="button" title="Keep the outside items fixed and make the horizontal gaps equal."><span class="ui-icon icon-space-horizontal" aria-hidden="true"></span><span>Space across</span></button>
               <button id="distributeSelectionVertical" type="button" title="Keep the outside items fixed and make the vertical gaps equal."><span class="ui-icon icon-space-vertical" aria-hidden="true"></span><span>Space down</span></button>
             </div>
-          </section>
-          <section class="batch-property-group">
-            <h3>Common properties</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" open>
+            <summary>Common properties</summary>
+            <div class="property-section-body">
             <label>Visible on page<select id="batchVisibility"><option value="__mixed__">Mixed</option><option value="true">Visible</option><option value="false">Hidden</option></select></label>
             <label>Layer<select id="batchLayer"><option value="__mixed__">Mixed</option><option value="">No layer</option></select></label>
-          </section>
-          <section class="batch-property-group" id="batchReviewGroup" hidden>
-            <h3>Review</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchReviewGroup" hidden>
+            <summary>Review</summary>
+            <div class="property-section-body">
             <label>Subject<div class="batch-apply-row"><input id="batchSubject" type="text" placeholder="Mixed" /><button id="applyBatchSubject" type="button">Apply</button></div></label>
             <label>Status<select id="batchStatus"><option value="__mixed__">Mixed</option><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
             <label>Comment<div class="batch-apply-row"><input id="batchComment" type="text" placeholder="Mixed" spellcheck="true" /><button id="applyBatchComment" type="button">Apply</button></div></label>
-          </section>
-          <section class="batch-property-group" id="batchStickyNoteGroup" hidden>
-            <h3>Sticky Note</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchStickyNoteGroup" hidden>
+            <summary>Sticky Note</summary>
+            <div class="property-section-body">
             <label>Note text<div class="batch-apply-row"><input id="batchStickyNoteText" type="text" placeholder="Mixed" spellcheck="true" /><button id="applyBatchStickyNoteText" type="button">Apply</button></div></label>
             <label>Subject<div class="batch-apply-row"><input id="batchStickyNoteSubject" type="text" placeholder="Mixed" /><button id="applyBatchStickyNoteSubject" type="button">Apply</button></div></label>
             <label>Author<div class="batch-apply-row"><input id="batchStickyNoteAuthor" type="text" placeholder="Mixed" /><button id="applyBatchStickyNoteAuthor" type="button">Apply</button></div></label>
             <label>Status<select id="batchStickyNoteStatus"><option value="__mixed__">Mixed</option><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
             <label>Note color<div class="color-field batch-color-field"><input id="batchStickyNoteColor" type="color" value="#f6c344" /><output id="batchStickyNoteColorValue">Mixed</output></div></label>
-          </section>
-          <section class="batch-property-group" id="batchTextGroup" hidden>
-            <h3>Text</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchTextGroup" hidden open>
+            <summary>Text</summary>
+            <div class="property-section-body">
             <label id="batchTextContentField" hidden><span id="batchTextContentLabel">Text</span><div class="batch-apply-row"><input id="batchTextContent" type="text" placeholder="Mixed" spellcheck="true" /><button id="applyBatchTextContent" type="button">Apply</button></div></label>
             <label class="toggle-row" id="batchShowFlagTextField" hidden><span><strong>Show flag text</strong><small>Show or hide the text without deleting it.</small></span><input id="batchShowFlagText" type="checkbox" role="switch" /></label>
             <label>Font<select id="batchFontFamily"><option value="__mixed__">Mixed</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
@@ -467,92 +478,150 @@
             <label id="batchBackgroundColorField" hidden>Background color<div class="color-field batch-color-field"><input id="batchBackgroundColor" type="color" value="#ffffff" /><output id="batchBackgroundColorValue">Mixed</output><button class="batch-clear-color" id="batchNoBackground" type="button">No background</button></div></label>
             <label id="batchBorderWidthField" hidden>Border width<div class="field-row"><input id="batchBorderWidth" type="range" min="0" max="10" step="1" /><output id="batchBorderWidthValue">Mixed</output></div></label>
             <label id="batchBorderColorField" hidden>Border color<div class="color-field batch-color-field"><input id="batchBorderColor" type="color" value="#15191f" /><output id="batchBorderColorValue">Mixed</output></div></label>
-          </section>
-          <section class="batch-property-group" id="batchLineGroup" hidden>
-            <h3>Line and border</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchLineGroup" hidden open>
+            <summary>Line and border</summary>
+            <div class="property-section-body">
             <label>Line thickness<div class="field-row"><input id="batchLineWidth" type="range" min="0.5" max="10" step="0.5" /><output id="batchLineWidthValue">Mixed</output></div></label>
             <label>Line color<div class="color-field batch-color-field"><input id="batchLineColor" type="color" value="#d04a3a" /><output id="batchLineColorValue">Mixed</output></div></label>
             <label id="batchLineTypeField">Line type<select id="batchLineType"><option value="__mixed__">Mixed</option><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
             <label id="batchLabelColorField" hidden>Label color<div class="color-field batch-color-field"><input id="batchLabelColor" type="color" value="#b33427" /><output id="batchLabelColorValue">Mixed</output></div></label>
             <label id="batchStartArrowField" hidden>Start arrow<select id="batchStartArrow"><option value="__mixed__">Mixed</option><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label>
             <label id="batchEndArrowField" hidden>End arrow<select id="batchEndArrow"><option value="__mixed__">Mixed</option><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label>
-          </section>
-          <section class="batch-property-group" id="batchFillGroup" hidden>
-            <h3>Background and fill</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchFillGroup" hidden open>
+            <summary>Background and fill</summary>
+            <div class="property-section-body">
             <label class="toggle-row" id="batchShapeInfillField" hidden><span><strong>Shape infill</strong><small>Show the shade and hatch inside the shape.</small></span><input id="batchShapeInfill" type="checkbox" role="switch" /></label>
             <label class="toggle-row" id="batchShowPerimeterField" hidden><span><strong>Show perimeter length</strong><small>Add the perimeter below the measurement label.</small></span><input id="batchShowPerimeter" type="checkbox" role="switch" /></label>
             <label class="toggle-row" id="batchShowAreaField" hidden><span><strong>Show area</strong><small>Add the area below the diameter label.</small></span><input id="batchShowArea" type="checkbox" role="switch" /></label>
             <label><span id="batchFillColorLabel">Fill color</span><div class="color-field batch-color-field"><input id="batchFillColor" type="color" value="#fff2a8" /><output id="batchFillColorValue">Mixed</output></div></label>
             <label id="batchFillOpacityField"><span id="batchFillOpacityLabel">Fill strength</span><div class="field-row"><input id="batchFillOpacity" type="range" min="0" max="100" step="5" /><output id="batchFillOpacityValue">Mixed</output></div></label>
             <label id="batchHatchPatternField">Hatch pattern<select id="batchHatchPattern"><option value="__mixed__">Mixed</option><option value="none">None</option><option value="diagonal">Diagonal</option><option value="crosshatch">Crosshatch</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
-          </section>
-          <section class="batch-property-group" id="batchHighlightGroup" hidden>
-            <h3>Highlight</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchHighlightGroup" hidden open>
+            <summary>Highlight</summary>
+            <div class="property-section-body">
             <label>Highlight color<div class="color-field batch-color-field"><input id="batchHighlightColor" type="color" value="#ffd84d" /><output id="batchHighlightColorValue">Mixed</output></div></label>
-          </section>
-          <section class="batch-property-group" id="batchRotationGroup" hidden>
-            <h3>Rotation</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchRotationGroup" hidden>
+            <summary>Rotation</summary>
+            <div class="property-section-body">
             <label>Angle in degrees<input id="batchRotation" type="number" min="0" max="359" step="1" placeholder="Mixed" /><small>Use one angle for all selected objects.</small></label>
-          </section>
-          <section class="batch-property-group" id="batchGeometryGroup" hidden>
-            <h3>Geometry</h3>
+            </div>
+          </details>
+          <details class="batch-property-group property-section" id="batchGeometryGroup" hidden>
+            <summary>Geometry</summary>
+            <div class="property-section-body">
             <label>Position and size<div class="geometry-grid"><span>X<input id="batchPosX" type="number" min="0" step="1" placeholder="Mixed" /></span><span>Y<input id="batchPosY" type="number" min="0" step="1" placeholder="Mixed" /></span><span>Width<input id="batchBoxWidth" type="number" min="1" step="1" placeholder="Mixed" /></span><span>Height<input id="batchBoxHeight" type="number" min="1" step="1" placeholder="Mixed" /></span></div></label>
             <label>Align selected item to page<div class="page-alignment-options" id="batchPageAlignment" role="group" aria-label="Align selected items to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
-          </section>
+            </div>
+          </details>
         </div>
         <div class="inspector-content" id="inspectorContent" hidden>
-          <div class="inspector-title"><span>Properties</span><button id="closeInspector" aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
-          <label class="toggle-row selected-visibility"><span><strong>Visible on page</strong><small>Hide this item without deleting it.</small></span><input id="selectedVisibility" type="checkbox" role="switch" checked /></label>
-          <label class="selected-layer-field">Layer<select id="selectedLayer"><option value="">No layer</option></select><small>Assign this item to a document layer.</small></label>
-          <label id="selectedRotationField" hidden>Rotation<input id="selectedRotation" type="number" min="0" max="359" step="1" value="0" /><small>Enter an angle from 0 to 359 degrees. Hold Shift while you drag the handle to use 15-degree steps.</small></label>
+          <div class="inspector-title"><span><strong id="inspectorSelectionKind">Selected item</strong><small>Properties</small></span><button id="closeInspector" data-inspector-navigation aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <!--
+            Native details/summary elements make each property group keyboard
+            accessible without custom accordion code. Their open state remains
+            attached to each item-specific group while users change selections.
+          -->
+          <details class="property-section property-section-common" open>
+            <summary>Common</summary>
+            <div class="property-section-body">
+              <label class="toggle-row selected-visibility"><span><strong>Visible on page</strong><small>Hide this item without deleting it.</small></span><input id="selectedVisibility" type="checkbox" role="switch" checked /></label>
+              <label class="selected-layer-field">Layer<select id="selectedLayer"><option value="">No layer</option></select><small>Assign this item to a document layer.</small></label>
+              <label id="selectedRotationField" hidden>Rotation<input id="selectedRotation" type="number" min="0" max="359" step="1" value="0" /><small>Enter an angle from 0 to 359 degrees. Hold Shift while you drag the handle to use 15-degree steps.</small></label>
+            </div>
+          </details>
           <div id="textProperties">
-          <label>Text<textarea id="textValue" rows="4" spellcheck="true"></textarea></label>
-          <label>Font<select id="fontFamily"><option value="original">Original font</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
-          <label>Font size<div class="field-row"><input id="fontSize" type="range" min="8" max="48" value="16" /><output id="fontSizeValue">16 pt</output></div></label>
-          <label id="lineHeightField">Line spacing<div class="field-row"><input id="lineHeight" type="range" min="1" max="2.5" step="0.05" value="1.25" /><output id="lineHeightValue">1.25×</output></div></label>
-          <label class="toggle-row"><span><strong>Auto-fit text box</strong><small>Match the box to the typed text.</small></span><input id="autoFitTextBox" type="checkbox" role="switch" /></label>
-          <label>Text style<div class="text-style-options" id="textStyleControls" role="group" aria-label="Text style"><button type="button" data-text-style="bold" aria-pressed="false"><strong>B</strong><span>Bold</span></button><button type="button" data-text-style="italic" aria-pressed="false"><em>I</em><span>Italic</span></button><button type="button" data-text-style="underline" aria-pressed="false"><span class="underline-letter">U</span><span>Underline</span></button></div></label>
-          <label>Horizontal alignment<div class="alignment-options" id="horizontalAlign" role="group" aria-label="Horizontal text alignment"><button data-align="left" class="selected"><span class="text-align-icon icon-text-left" aria-hidden="true"></span><span>Left</span></button><button data-align="center"><span class="text-align-icon icon-text-center" aria-hidden="true"></span><span>Center</span></button><button data-align="right"><span class="text-align-icon icon-text-right" aria-hidden="true"></span><span>Right</span></button></div></label>
-          <label>Vertical alignment<div class="alignment-options" id="verticalAlign" role="group" aria-label="Vertical text alignment"><button data-align="top" class="selected"><span class="text-align-icon icon-text-top" aria-hidden="true"></span><span>Top</span></button><button data-align="middle"><span class="text-align-icon icon-text-middle" aria-hidden="true"></span><span>Middle</span></button><button data-align="bottom"><span class="text-align-icon icon-text-bottom" aria-hidden="true"></span><span>Bottom</span></button></div></label>
-          <label>Text color<div class="color-combo"><div class="swatches" id="swatches"><button style="--swatch:#15191f" data-color="#15191f" class="selected" aria-label="Charcoal"></button><button style="--swatch:#2563eb" data-color="#2563eb" aria-label="Blue"></button><button style="--swatch:#dc2626" data-color="#dc2626" aria-label="Red"></button><button style="--swatch:#16845b" data-color="#16845b" aria-label="Green"></button></div><input id="textColorCustom" type="color" value="#15191f" aria-label="Custom text color" title="Custom color" /></div></label>
-          <label>Background color<div class="color-combo"><div class="swatches" id="backgroundSwatches"><button class="transparent selected" data-bg="transparent" aria-label="No background"></button><button style="--swatch:#ffffff" data-bg="#ffffff" aria-label="White"></button><button style="--swatch:#fff2a8" data-bg="#fff2a8" aria-label="Yellow"></button><button style="--swatch:#dbeafe" data-bg="#dbeafe" aria-label="Blue"></button><button style="--swatch:#fce7f3" data-bg="#fce7f3" aria-label="Pink"></button></div><input id="backgroundColorCustom" type="color" value="#ffffff" aria-label="Custom background color" title="Custom color" /></div></label>
-          <label>Border width<div class="field-row"><input id="borderWidth" type="range" min="0" max="10" step="1" value="0" /><output id="borderWidthValue">0 pt</output></div></label>
-          <label>Border color<div class="color-combo"><div class="swatches" id="borderSwatches"><button style="--swatch:#15191f" data-border-color="#15191f" class="selected" aria-label="Charcoal border"></button><button style="--swatch:#2563eb" data-border-color="#2563eb" aria-label="Blue border"></button><button style="--swatch:#dc2626" data-border-color="#dc2626" aria-label="Red border"></button><button style="--swatch:#16845b" data-border-color="#16845b" aria-label="Green border"></button><button style="--swatch:#ffffff" data-border-color="#ffffff" aria-label="White border"></button></div><input id="borderColorCustom" type="color" value="#15191f" aria-label="Custom border color" title="Custom color" /></div></label>
-          <label>Position and size<div class="geometry-grid"><span>X<input id="posX" type="number" min="0" step="1" /></span><span>Y<input id="posY" type="number" min="0" step="1" /></span><span>Width<input id="boxWidth" type="number" min="30" step="1" /></span><span>Height<input id="boxHeight" type="number" min="12" step="1" /></span></div></label>
-          <label>Align selected item to page<div class="page-alignment-options" id="pageAlignment" role="group" aria-label="Align selected item to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
-          <label id="highlightColorField" hidden>Highlight color<div class="color-combo"><div class="swatches highlight-swatches"><button style="--swatch:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--swatch:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--swatch:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--swatch:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--swatch:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--swatch:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button></div><input id="highlightColorCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom color" /></div></label>
-          <p class="edit-note" id="editNote">Export removes original text from edited pages. Edited and inserted text stays sharp and selectable.</p>
+            <details class="property-section" id="textContentSection" open>
+              <summary>Text</summary>
+              <div class="property-section-body">
+                <label>Text<textarea id="textValue" rows="4" spellcheck="true"></textarea></label>
+                <label>Font<select id="fontFamily"><option value="original">Original font</option><option value="Arial, Helvetica, sans-serif">Arial</option><option value="Georgia, 'Times New Roman', serif">Georgia</option><option value="'Times New Roman', Times, serif">Times New Roman</option><option value="Verdana, Geneva, sans-serif">Verdana</option><option value="'Courier New', Courier, monospace">Courier New</option></select></label>
+                <label>Font size<div class="field-row"><input id="fontSize" type="range" min="8" max="48" value="16" /><output id="fontSizeValue">16 pt</output></div></label>
+                <label id="lineHeightField">Line spacing<div class="field-row"><input id="lineHeight" type="range" min="1" max="2.5" step="0.05" value="1.25" /><output id="lineHeightValue">1.25×</output></div></label>
+                <label class="toggle-row"><span><strong>Auto-fit text box</strong><small>Match the box to the typed text.</small></span><input id="autoFitTextBox" type="checkbox" role="switch" /></label>
+                <label>Text style<div class="text-style-options" id="textStyleControls" role="group" aria-label="Text style"><button type="button" data-text-style="bold" aria-pressed="false"><strong>B</strong><span>Bold</span></button><button type="button" data-text-style="italic" aria-pressed="false"><em>I</em><span>Italic</span></button><button type="button" data-text-style="underline" aria-pressed="false"><span class="underline-letter">U</span><span>Underline</span></button></div></label>
+                <label>Horizontal alignment<div class="alignment-options" id="horizontalAlign" role="group" aria-label="Horizontal text alignment"><button data-align="left" class="selected"><span class="text-align-icon icon-text-left" aria-hidden="true"></span><span>Left</span></button><button data-align="center"><span class="text-align-icon icon-text-center" aria-hidden="true"></span><span>Center</span></button><button data-align="right"><span class="text-align-icon icon-text-right" aria-hidden="true"></span><span>Right</span></button></div></label>
+                <label>Vertical alignment<div class="alignment-options" id="verticalAlign" role="group" aria-label="Vertical text alignment"><button data-align="top" class="selected"><span class="text-align-icon icon-text-top" aria-hidden="true"></span><span>Top</span></button><button data-align="middle"><span class="text-align-icon icon-text-middle" aria-hidden="true"></span><span>Middle</span></button><button data-align="bottom"><span class="text-align-icon icon-text-bottom" aria-hidden="true"></span><span>Bottom</span></button></div></label>
+                <label>Text color<div class="color-combo"><div class="swatches" id="swatches"><button style="--swatch:#15191f" data-color="#15191f" class="selected" aria-label="Charcoal"></button><button style="--swatch:#2563eb" data-color="#2563eb" aria-label="Blue"></button><button style="--swatch:#dc2626" data-color="#dc2626" aria-label="Red"></button><button style="--swatch:#16845b" data-color="#16845b" aria-label="Green"></button></div><input id="textColorCustom" type="color" value="#15191f" aria-label="Custom text color" title="Custom color" /></div></label>
+              </div>
+            </details>
+            <details class="property-section" open>
+              <summary>Appearance</summary>
+              <div class="property-section-body">
+                <label>Background color<div class="color-combo"><div class="swatches" id="backgroundSwatches"><button class="transparent selected" data-bg="transparent" aria-label="No background"></button><button style="--swatch:#ffffff" data-bg="#ffffff" aria-label="White"></button><button style="--swatch:#fff2a8" data-bg="#fff2a8" aria-label="Yellow"></button><button style="--swatch:#dbeafe" data-bg="#dbeafe" aria-label="Blue"></button><button style="--swatch:#fce7f3" data-bg="#fce7f3" aria-label="Pink"></button></div><input id="backgroundColorCustom" type="color" value="#ffffff" aria-label="Custom background color" title="Custom color" /></div></label>
+                <label>Border width<div class="field-row"><input id="borderWidth" type="range" min="0" max="10" step="1" value="0" /><output id="borderWidthValue">0 pt</output></div></label>
+                <label>Border color<div class="color-combo"><div class="swatches" id="borderSwatches"><button style="--swatch:#15191f" data-border-color="#15191f" class="selected" aria-label="Charcoal border"></button><button style="--swatch:#2563eb" data-border-color="#2563eb" aria-label="Blue border"></button><button style="--swatch:#dc2626" data-border-color="#dc2626" aria-label="Red border"></button><button style="--swatch:#16845b" data-border-color="#16845b" aria-label="Green border"></button><button style="--swatch:#ffffff" data-border-color="#ffffff" aria-label="White border"></button></div><input id="borderColorCustom" type="color" value="#15191f" aria-label="Custom border color" title="Custom color" /></div></label>
+                <label id="highlightColorField" hidden>Highlight color<div class="color-combo"><div class="swatches highlight-swatches"><button style="--swatch:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--swatch:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--swatch:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--swatch:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--swatch:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--swatch:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button></div><input id="highlightColorCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom color" /></div></label>
+              </div>
+            </details>
+            <details class="property-section" id="textGeometrySection">
+              <summary>Geometry</summary>
+              <div class="property-section-body">
+                <label>Position and size<div class="geometry-grid"><span>X<input id="posX" type="number" min="0" step="1" /></span><span>Y<input id="posY" type="number" min="0" step="1" /></span><span>Width<input id="boxWidth" type="number" min="30" step="1" /></span><span>Height<input id="boxHeight" type="number" min="12" step="1" /></span></div></label>
+                <label>Align selected item to page<div class="page-alignment-options" id="pageAlignment" role="group" aria-label="Align selected item to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
+              </div>
+            </details>
+            <p class="edit-note" id="editNote">Export removes original text from edited pages. Edited and inserted text stays sharp and selectable.</p>
           </div>
           <div class="sticky-note-properties" id="stickyNoteProperties" hidden>
             <div class="measurement-kind">Sticky Note</div>
-            <label>Note text<textarea id="stickyNoteText" rows="6" spellcheck="true"></textarea></label>
-            <label>Subject<input id="stickyNoteSubject" type="text" /></label>
-            <label>Author<input id="stickyNoteAuthor" type="text" /></label>
-            <label>Status<select id="stickyNoteStatus"><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
-            <label>Note color<div class="color-combo preset-picker" id="stickyNoteColorPresets"><div class="swatches"><button style="--swatch:#f6c344" data-preset="#f6c344" aria-label="Yellow"></button><button style="--swatch:#86e59d" data-preset="#86e59d" aria-label="Green"></button><button style="--swatch:#7cc8ff" data-preset="#7cc8ff" aria-label="Blue"></button><button style="--swatch:#ff9fc6" data-preset="#ff9fc6" aria-label="Pink"></button><button style="--swatch:#ffb66e" data-preset="#ffb66e" aria-label="Orange"></button><button style="--swatch:#c4a8ff" data-preset="#c4a8ff" aria-label="Purple"></button></div><div class="color-field"><input id="stickyNoteColor" type="color" value="#f6c344" aria-label="Custom note color" /><output id="stickyNoteColorValue">#F6C344</output></div></div></label>
-            <label>Position<div class="geometry-grid sticky-note-position"><span>X<input id="stickyNoteX" type="number" min="0" step="1" /></span><span>Y<input id="stickyNoteY" type="number" min="0" step="1" /></span></div></label>
-            <label>Align selected item to page<div class="page-alignment-options" id="stickyNotePageAlignment" role="group" aria-label="Align Sticky Note to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
-            <dl class="sticky-note-dates"><div><dt>Created</dt><dd id="stickyNoteCreated">Not available</dd></div><div><dt>Modified</dt><dd id="stickyNoteModified">Not available</dd></div></dl>
-            <p class="edit-note">Double-click the page icon to open this note. Editable PDF export keeps it as a standard PDF note.</p>
+            <details class="property-section" open>
+              <summary>Content</summary>
+              <div class="property-section-body">
+                <label>Note text<textarea id="stickyNoteText" rows="6" spellcheck="true"></textarea></label>
+                <div class="property-pair"><label>Subject<input id="stickyNoteSubject" type="text" /></label><label>Author<input id="stickyNoteAuthor" type="text" /></label></div>
+                <label>Status<select id="stickyNoteStatus"><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
+              </div>
+            </details>
+            <details class="property-section" open>
+              <summary>Appearance</summary>
+              <div class="property-section-body">
+                <label>Note color<div class="color-combo preset-picker" id="stickyNoteColorPresets"><div class="swatches"><button style="--swatch:#f6c344" data-preset="#f6c344" aria-label="Yellow"></button><button style="--swatch:#86e59d" data-preset="#86e59d" aria-label="Green"></button><button style="--swatch:#7cc8ff" data-preset="#7cc8ff" aria-label="Blue"></button><button style="--swatch:#ff9fc6" data-preset="#ff9fc6" aria-label="Pink"></button><button style="--swatch:#ffb66e" data-preset="#ffb66e" aria-label="Orange"></button><button style="--swatch:#c4a8ff" data-preset="#c4a8ff" aria-label="Purple"></button></div><div class="color-field"><input id="stickyNoteColor" type="color" value="#f6c344" aria-label="Custom note color" /><output id="stickyNoteColorValue">#F6C344</output></div></div></label>
+              </div>
+            </details>
+            <details class="property-section">
+              <summary>Geometry and details</summary>
+              <div class="property-section-body">
+                <label>Position<div class="geometry-grid sticky-note-position"><span>X<input id="stickyNoteX" type="number" min="0" step="1" /></span><span>Y<input id="stickyNoteY" type="number" min="0" step="1" /></span></div></label>
+                <label>Align selected item to page<div class="page-alignment-options" id="stickyNotePageAlignment" role="group" aria-label="Align Sticky Note to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
+                <dl class="sticky-note-dates"><div><dt>Created</dt><dd id="stickyNoteCreated">Not available</dd></div><div><dt>Modified</dt><dd id="stickyNoteModified">Not available</dd></div></dl>
+                <p class="edit-note">Double-click the page icon to open this note. Editable PDF export keeps it as a standard PDF note.</p>
+              </div>
+            </details>
           </div>
           <div class="measurement-properties" id="measurementProperties" hidden>
             <div class="measurement-kind" id="measurementKind">Length measurement</div>
-            <label>Label color<div class="color-combo preset-picker" id="measurementLabelPresets"><div class="swatches"><button style="--swatch:#b33427" data-preset="#b33427" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="measurementLabelColor" type="color" value="#b33427" aria-label="Custom label color" /><output id="measurementLabelColorValue">#B33427</output></div></div></label>
-            <label class="toggle-row" id="measurementPerimeterField" hidden><span><strong>Show perimeter length</strong><small>Add the perimeter below the measurement label.</small></span><input id="measurementShowPerimeter" type="checkbox" role="switch" /></label>
-            <label class="toggle-row" id="measurementShowAreaField" hidden><span><strong>Show area</strong><small>Add the area below the diameter label.</small></span><input id="measurementShowArea" type="checkbox" role="switch" /></label>
-            <label>Line thickness<div class="field-row"><input id="measurementLineWidth" type="range" min="0.5" max="8" step="0.5" value="1.5" /><output id="measurementLineWidthValue">1.5 pt</output></div></label>
-            <label>Line color<div class="color-combo preset-picker" id="measurementLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="measurementLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="measurementLineColorValue">#D04A3A</output></div></div></label>
-            <label>Line type<select id="measurementLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
-            <div id="measurementAreaFields">
-              <label class="toggle-row"><span><strong>Shape infill</strong><small>Show the shade and hatch inside the shape.</small></span><input id="measurementAreaFill" type="checkbox" role="switch" checked /></label>
-              <label>Shape shade<div class="color-combo preset-picker" id="measurementShadePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#fff2a8" data-preset="#fff2a8" aria-label="Yellow"></button></div><div class="color-field"><input id="measurementShadeColor" type="color" value="#d04a3a" aria-label="Custom shade color" /><output id="measurementShadeColorValue">#D04A3A</output></div></div></label>
-              <label>Shade strength<div class="field-row"><input id="measurementShadeOpacity" type="range" min="0" max="100" step="5" value="15" /><output id="measurementShadeOpacityValue">15%</output></div></label>
-              <label>Hatch pattern<select id="measurementHatchPattern"><option value="none">None</option><option value="diagonal">Diagonal</option><option value="crosshatch">Crosshatch</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
-            </div>
-            <p class="edit-note">These properties stay with the measurement in the page view, thumbnails, and exported PDF.</p>
+            <details class="property-section" open>
+              <summary>Appearance</summary>
+              <div class="property-section-body">
+                <label>Label color<div class="color-combo preset-picker" id="measurementLabelPresets"><div class="swatches"><button style="--swatch:#b33427" data-preset="#b33427" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="measurementLabelColor" type="color" value="#b33427" aria-label="Custom label color" /><output id="measurementLabelColorValue">#B33427</output></div></div></label>
+                <label class="toggle-row" id="measurementPerimeterField" hidden><span><strong>Show perimeter length</strong><small>Add the perimeter below the measurement label.</small></span><input id="measurementShowPerimeter" type="checkbox" role="switch" /></label>
+                <label class="toggle-row" id="measurementShowAreaField" hidden><span><strong>Show area</strong><small>Add the area below the diameter label.</small></span><input id="measurementShowArea" type="checkbox" role="switch" /></label>
+                <label>Line thickness<div class="field-row"><input id="measurementLineWidth" type="range" min="0.5" max="8" step="0.5" value="1.5" /><output id="measurementLineWidthValue">1.5 pt</output></div></label>
+                <label>Line color<div class="color-combo preset-picker" id="measurementLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="measurementLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="measurementLineColorValue">#D04A3A</output></div></div></label>
+                <label>Line type<select id="measurementLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
+                <div id="measurementAreaFields">
+                  <label class="toggle-row"><span><strong>Shape infill</strong><small>Show the shade and hatch inside the shape.</small></span><input id="measurementAreaFill" type="checkbox" role="switch" checked /></label>
+                  <label>Shape shade<div class="color-combo preset-picker" id="measurementShadePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#fff2a8" data-preset="#fff2a8" aria-label="Yellow"></button></div><div class="color-field"><input id="measurementShadeColor" type="color" value="#d04a3a" aria-label="Custom shade color" /><output id="measurementShadeColorValue">#D04A3A</output></div></div></label>
+                  <label>Shade strength<div class="field-row"><input id="measurementShadeOpacity" type="range" min="0" max="100" step="5" value="15" /><output id="measurementShadeOpacityValue">15%</output></div></label>
+                  <label>Hatch pattern<select id="measurementHatchPattern"><option value="none">None</option><option value="diagonal">Diagonal</option><option value="crosshatch">Crosshatch</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+                </div>
+                <p class="edit-note">These properties stay with the measurement in the page view, thumbnails, and exported PDF.</p>
+              </div>
+            </details>
           </div>
           <div class="markup-properties" id="markupProperties" hidden>
             <div class="measurement-kind" id="markupKind">Drawing markup</div>
+            <details class="property-section" id="markupContentSection" open hidden>
+              <summary>Content</summary>
+              <div class="property-section-body">
             <div id="markupLegendFields" hidden>
               <label>Title<input id="markupLegendTitle" type="text" value="Takeoff Summary" /></label>
               <label>Scope<select id="markupLegendScope"><option value="document">Document</option><option value="page">Legend page</option></select></label>
@@ -601,15 +670,26 @@
               <label>Align selected item to page<div class="page-alignment-options" id="markupStampPageAlignment" role="group" aria-label="Align stamp to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
               <button class="button secondary stamp-save-preset" id="saveStampPresetButton" type="button" title="Save this stamp in the Stamp menu in this browser.">Save as stamp preset</button>
             </div>
-            <label>Line thickness<div class="field-row"><input id="markupLineWidth" type="range" min="0" max="10" step="0.5" value="2" /><output id="markupLineWidthValue">2 pt</output></div></label>
-            <label>Line color<div class="color-combo preset-picker" id="markupLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="markupLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="markupLineColorValue">#D04A3A</output></div></div></label>
-            <label>Line type<select id="markupLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
-            <div id="markupArrowFields"><label id="markupStartArrowField">Start arrow<select id="markupStartArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label><label id="markupEndArrowField">End arrow<select id="markupEndArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label></div>
-            <div id="markupFillFields"><label>Fill color<div class="color-combo preset-picker" id="markupFillPresets"><div class="swatches"><button style="--swatch:#fff2a8" data-preset="#fff2a8" aria-label="Yellow"></button><button style="--swatch:#dbeafe" data-preset="#dbeafe" aria-label="Blue"></button><button style="--swatch:#fce7f3" data-preset="#fce7f3" aria-label="Pink"></button><button style="--swatch:#dcfce7" data-preset="#dcfce7" aria-label="Green"></button></div><div class="color-field"><input id="markupFillColor" type="color" value="#fff2a8" aria-label="Custom fill color" /><output id="markupFillColorValue">#FFF2A8</output></div></div></label><label>Fill strength<div class="field-row"><input id="markupFillOpacity" type="range" min="0" max="100" step="5" value="18" /><output id="markupFillOpacityValue">18%</output></div></label></div>
-            <label>Subject<input id="markupSubject" type="text" /></label>
-            <label>Status<select id="markupStatus"><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label>
-            <label>Comment<textarea id="markupComment" rows="4" spellcheck="true"></textarea></label>
-            <p class="edit-note">The drawing exports to PDF. Use the Markups List CSV to save review data.</p>
+              </div>
+            </details>
+            <details class="property-section" open>
+              <summary>Line and fill</summary>
+              <div class="property-section-body">
+                <label>Line thickness<div class="field-row"><input id="markupLineWidth" type="range" min="0" max="10" step="0.5" value="2" /><output id="markupLineWidthValue">2 pt</output></div></label>
+                <label>Line color<div class="color-combo preset-picker" id="markupLinePresets"><div class="swatches"><button style="--swatch:#d04a3a" data-preset="#d04a3a" aria-label="Red"></button><button style="--swatch:#2563eb" data-preset="#2563eb" aria-label="Blue"></button><button style="--swatch:#16845b" data-preset="#16845b" aria-label="Green"></button><button style="--swatch:#15191f" data-preset="#15191f" aria-label="Charcoal"></button></div><div class="color-field"><input id="markupLineColor" type="color" value="#d04a3a" aria-label="Custom line color" /><output id="markupLineColorValue">#D04A3A</output></div></div></label>
+                <label>Line type<select id="markupLineType"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option><option value="centerline">Centerline</option></select></label>
+                <div class="property-pair" id="markupArrowFields"><label id="markupStartArrowField">Start arrow<select id="markupStartArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label><label id="markupEndArrowField">End arrow<select id="markupEndArrow"><option value="none">None</option><option value="open">Open</option><option value="closed">Closed</option><option value="filled">Filled</option><option value="circle">Circle</option><option value="square">Square</option><option value="diamond">Diamond</option></select></label></div>
+                <div id="markupFillFields"><label>Fill color<div class="color-combo preset-picker" id="markupFillPresets"><div class="swatches"><button style="--swatch:#fff2a8" data-preset="#fff2a8" aria-label="Yellow"></button><button style="--swatch:#dbeafe" data-preset="#dbeafe" aria-label="Blue"></button><button style="--swatch:#fce7f3" data-preset="#fce7f3" aria-label="Pink"></button><button style="--swatch:#dcfce7" data-preset="#dcfce7" aria-label="Green"></button></div><div class="color-field"><input id="markupFillColor" type="color" value="#fff2a8" aria-label="Custom fill color" /><output id="markupFillColorValue">#FFF2A8</output></div></div></label><label>Fill strength<div class="field-row"><input id="markupFillOpacity" type="range" min="0" max="100" step="5" value="18" /><output id="markupFillOpacityValue">18%</output></div></label></div>
+              </div>
+            </details>
+            <details class="property-section">
+              <summary>Review</summary>
+              <div class="property-section-body">
+                <div class="property-pair"><label>Subject<input id="markupSubject" type="text" /></label><label>Status<select id="markupStatus"><option>None</option><option>Accepted</option><option>Rejected</option><option>Completed</option><option>Cancelled</option></select></label></div>
+                <label>Comment<textarea id="markupComment" rows="4" spellcheck="true"></textarea></label>
+                <p class="edit-note">The drawing exports to PDF. Use the Markups List CSV to save review data.</p>
+              </div>
+            </details>
           </div>
         </div>
         <div class="item-default-controls" id="itemDefaultControls" hidden>
