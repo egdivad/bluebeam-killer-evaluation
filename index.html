@@ -52,8 +52,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-qfYh_hPn.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BsF_KT1T.css">
+    <script type="module" crossorigin src="./assets/index-BB33ESnI.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dj57htJU.css">
   </head>
   <body>
     <!--
@@ -327,9 +327,10 @@
             <button data-selection-tool="select" type="button" role="menuitemradio" title="Select added items (V)" aria-keyshortcuts="V" aria-checked="true"><span class="ui-icon icon-pointer" aria-hidden="true"></span><span><strong>Select</strong><small>Select and move added items</small></span><kbd class="tool-shortcut">V</kbd><span class="select-tool-check" aria-hidden="true">&#10003;</span></button>
             <button data-selection-tool="lasso" type="button" role="menuitemradio" title="Lasso select added items (Shift+V)" aria-keyshortcuts="Shift+V" aria-checked="false"><span class="ui-icon icon-lasso" aria-hidden="true"></span><span><strong>Lasso</strong><small>Draw around added items</small></span><kbd class="tool-shortcut">Shift+V</kbd><span class="select-tool-check" aria-hidden="true">&#10003;</span></button>
           </div>
-          <div class="form-tool-menu" id="formToolMenu" role="menu" aria-label="Manual form field type" hidden>
+          <div class="form-tool-menu" id="formToolMenu" role="menu" aria-label="Form tools" hidden>
             <button type="button" role="menuitem" data-manual-form-type="text"><span class="ui-icon icon-type" aria-hidden="true"></span><span><strong>Text field</strong><small>Double-click page to place</small></span></button>
             <button type="button" role="menuitem" data-manual-form-type="checkbox"><span class="ui-icon icon-square" aria-hidden="true"></span><span><strong>Checkbox</strong><small>Double-click page to place</small></span></button>
+            <button type="button" role="menuitem" data-form-action="detect-boxes" title="Trace one printed text box, then find matching vector boxes across every page."><span class="ui-icon icon-scan" aria-hidden="true"></span><span><strong>Detect matching boxes</strong><small>Trace one box, then scan all pages</small></span></button>
           </div>
         </nav>
 
@@ -722,7 +723,7 @@
     <dialog class="shortcut-dialog" id="shortcutDialog" aria-labelledby="shortcutTitle">
       <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <div class="shortcut-sections">
-        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd>, choose Select or Lasso from the split menu</dd></div><div><dt>Lasso selection</dt><dd><kbd>Shift+V</kbd></dd></div><div><dt>Select by properties</dt><dd><kbd>Ctrl+Shift+F</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div><div><dt>Form mode</dt><dd><kbd>F</kbd>, choose manual field tools from the split menu</dd></div></dl></section>
+        <section><h3>Tools</h3><dl><div><dt>Select</dt><dd><kbd>V</kbd>, choose Select or Lasso from the split menu</dd></div><div><dt>Lasso selection</dt><dd><kbd>Shift+V</kbd></dd></div><div><dt>Select by properties</dt><dd><kbd>Ctrl+Shift+F</kbd></dd></div><div><dt>Highlight</dt><dd><kbd>H</kbd></dd></div><div><dt>Insert text</dt><dd><kbd>T</kbd></dd></div><div><dt>Edit text</dt><dd><kbd>Shift+E</kbd></dd></div><div><dt>Form mode</dt><dd><kbd>F</kbd>, choose manual fields or guided detection from the split menu</dd></div></dl></section>
         <section><h3>File and pages</h3><dl><div><dt>Open PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div><div><dt>Save editable PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div><div><dt>Export PDF</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></dd></div><div><dt>Search document</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div><div><dt>Previous / next page</dt><dd><kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd></dd></div><div><dt>First / last page</dt><dd><kbd>Home</kbd> / <kbd>End</kbd></dd></div><div><dt>Insert blank page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></dd></div><div><dt>Delete current page</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dd></div></dl></section>
         <section><h3>Align selected item</h3><dl><div><dt>Left / right</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>L</kbd> / <kbd>R</kbd></dd></div><div><dt>Top / bottom</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> / <kbd>B</kbd></dd></div><div><dt>Page center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd></dd></div><div><dt>Vertical center</dt><dd><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>M</kbd></dd></div></dl></section>
         <section><h3>Markups</h3><dl><div><dt>Undo last polygon point</dt><dd><kbd>Ctrl+Z</kbd></dd></div><div><dt>Remove selected polygon point</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Lock to 45-degree steps</dt><dd><kbd>Shift</kbd></dd></div><div><dt>Cloud</dt><dd><kbd>C</kbd></dd></div><div><dt>Arrow</dt><dd><kbd>A</kbd></dd></div><div><dt>Rectangle</dt><dd><kbd>R</kbd></dd></div><div><dt>Ellipse</dt><dd><kbd>E</kbd></dd></div><div><dt>Line</dt><dd><kbd>L</kbd></dd></div><div><dt>Callout</dt><dd><kbd>Q</kbd></dd></div><div><dt>Sticky Note</dt><dd><kbd>N</kbd></dd></div><div><dt>Flag</dt><dd><kbd>Shift+F</kbd></dd></div><div><dt>Polygon</dt><dd><kbd>Shift+P</kbd></dd></div></dl></section>
@@ -772,6 +773,19 @@
         <label>Apply to<select id="scaleApplyScope"><option value="current">Current page</option><option value="selected">Selected pages</option><option value="all">All pages</option></select></label>
         <label class="scale-check"><input id="scaleUpdateExisting" type="checkbox" /> Update existing measurements on these pages</label>
         <div class="scale-dialog-actions"><button class="button secondary" id="cancelScale" type="button">Cancel</button><button class="button primary" id="applyScale" type="submit">Set scale</button></div>
+      </form>
+    </dialog>
+    <!--
+      Guided detection stays explicit. Tracing only records sample dimensions;
+      this dialog gives users one final review before any fields are created.
+    -->
+    <dialog class="scale-dialog form-box-dialog" id="formBoxDetectionDialog" aria-labelledby="formBoxDetectionTitle">
+      <form id="formBoxDetectionForm">
+        <div class="scale-dialog-heading"><span class="ui-icon icon-scan" aria-hidden="true"></span><div><strong id="formBoxDetectionTitle">Detect matching boxes</strong><small>Review the traced sample before scanning every page.</small></div></div>
+        <p class="scale-current" id="formBoxSampleSize">Sample: 0.00 × 0.00 points</p>
+        <label>Size tolerance<input id="formBoxTolerance" type="number" min="0" max="30" step="1" value="10" aria-describedby="formBoxToleranceHelp" /></label>
+        <small id="formBoxToleranceHelp">Width and height must each stay within this percentage.</small>
+        <div class="scale-dialog-actions"><button class="button secondary" id="cancelFormBoxDetection" type="button">Cancel</button><button class="button primary" id="confirmFormBoxDetection" type="submit">Scan all pages</button></div>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
