@@ -52,8 +52,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-DtDZnCEc.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CYs46q0e.css">
+    <script type="module" crossorigin src="./assets/index-TTpuHWA7.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-LwrQQQgG.css">
   </head>
   <body>
     <!--
@@ -126,7 +126,7 @@
       <button data-markup-tool="callout" aria-keyshortcuts="Q"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Callout</strong><small>Drag from the arrow head</small></span><kbd class="tool-shortcut">Q</kbd></button>
       <button data-markup-tool="flag" aria-keyshortcuts="Shift+F"><span class="ui-icon icon-flag" aria-hidden="true"></span><span><strong>Flag</strong><small>Click to place a text flag</small></span><kbd class="tool-shortcut">Shift+F</kbd></button>
       <button data-markup-tool="note" aria-keyshortcuts="N"><span class="ui-icon icon-message-square" aria-hidden="true"></span><span><strong>Sticky Note</strong><small>Click to place and add a note</small></span><kbd class="tool-shortcut">N</kbd></button>
-      <button data-markup-tool="image" aria-keyshortcuts="I"><span class="ui-icon icon-scan" aria-hidden="true"></span><span><strong>Image</strong><small>Place a PNG or JPEG</small></span><kbd class="tool-shortcut">I</kbd></button>
+      <button data-markup-tool="image" aria-keyshortcuts="I"><span class="ui-icon icon-image" aria-hidden="true"></span><span><strong>Image</strong><small>Place a PNG or JPEG</small></span><kbd class="tool-shortcut">I</kbd></button>
       <button data-markup-tool="freehand"><span class="ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Freehand</strong><small>Draw with the pointer</small></span></button>
     </div>
 
@@ -136,7 +136,7 @@
       <div class="stamp-saved-heading"><strong>Saved stamps</strong><span id="savedStampCount">0 saved</span></div>
       <div class="stamp-preset-grid saved" id="savedStampPresets"></div>
       <p class="stamp-empty" id="savedStampEmpty">No custom stamps are saved.</p>
-      <div class="stamp-menu-actions"><button type="button" id="customTextStampButton"><span class="ui-icon icon-type" aria-hidden="true"></span>Custom text</button><button type="button" id="customImageStampButton"><span class="ui-icon icon-file" aria-hidden="true"></span>Image stamp</button></div>
+      <div class="stamp-menu-actions"><button type="button" id="customTextStampButton"><span class="ui-icon icon-type" aria-hidden="true"></span>Custom text</button><button type="button" id="customImageStampButton"><span class="ui-icon icon-image" aria-hidden="true"></span>Image stamp</button></div>
       <input id="stampImageFileInput" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden />
     </div>
 
