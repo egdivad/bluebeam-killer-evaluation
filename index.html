@@ -36,6 +36,7 @@
       at the end of <body> after every element it needs has been created.
     -->
     <meta charset="UTF-8" />
+    <!-- Search engines and link previews read these labels; editor code does not. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Review, mark up, measure, edit, organise, and export PDFs in your browser." />
     <meta property="og:title" content="Bluebeam Killer" />
@@ -67,13 +68,16 @@
       separately named file.
     -->
     <header class="topbar">
+      <!-- Branding stays static. Document name and save status beside it are dynamic. -->
       <div class="brand"><span class="brand-mark">BK</span><span class="brand-name"><span class="brand-title">Bluebeam Killer</span><span class="build-badges"><small class="wip-badge" title="Beta build">Beta</small></span></span></div>
       <div class="document-title">
         <button class="icon-button mobile-only" id="toggleSidebar" aria-label="Show document panels"><span class="ui-icon icon-menu" aria-hidden="true"></span></button>
         <div><strong id="fileName">No PDF open</strong><span id="saveState">Open a PDF to begin</span></div>
       </div>
       <div class="top-actions">
+        <!-- Native file input stays hidden; Open buttons and Ctrl+O activate it. -->
         <input id="fileInput" type="file" accept="application/pdf" hidden />
+        <!-- `aria-pressed` reports current theme state after app.js synchronises it. -->
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Use dark mode" aria-pressed="false"><span class="ui-icon icon-moon theme-moon" aria-hidden="true"></span><span class="ui-icon icon-sun theme-sun" aria-hidden="true"></span></button>
         <button class="theme-toggle settings-toggle" id="settingsButton" type="button" aria-label="Open settings" title="Settings"><span class="ui-icon icon-settings" aria-hidden="true"></span></button>
         <button class="button secondary" id="openButton" aria-keyshortcuts="Control+O" title="Open a PDF, or drag and drop a PDF anywhere in this window.">Open PDF</button>
@@ -102,6 +106,7 @@
       opens one palette at a time. Each `data-*-tool` value is the stable link
       between a menu choice and the tool logic in app.js.
     -->
+    <!-- Measurement menu choices map directly to `measure-*` tool names in app.js. -->
     <div class="measure-menu" id="measureMenu" hidden>
       <div class="measure-menu-heading"><strong>Measure</strong><span id="measureScaleStatus">Scale not set</span></div>
       <button data-measure-tool="calibrate"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><span><strong>Set scale</strong><small>Calibrate from two points</small></span></button>
@@ -115,6 +120,7 @@
       <button data-measure-tool="count" aria-keyshortcuts="Alt+Shift+C"><span class="ui-icon icon-hash" aria-hidden="true"></span><span><strong>Count</strong><small>Click each item</small></span><kbd class="tool-shortcut">Shift+Alt+C</kbd></button>
     </div>
 
+    <!-- Markup menu choices map directly to `markup-*` tool names in app.js. -->
     <div class="markup-menu" id="markupMenu" hidden>
       <div class="markup-menu-heading"><strong>Markup</strong><span>Local review tools</span></div>
       <button data-markup-tool="line" aria-keyshortcuts="L"><span class="ui-icon icon-line" aria-hidden="true"></span><span><strong>Line</strong><small>Drag between two points</small></span><kbd class="tool-shortcut">L</kbd></button>
@@ -130,6 +136,11 @@
       <button data-markup-tool="freehand"><span class="ui-icon icon-pencil" aria-hidden="true"></span><span><strong>Freehand</strong><small>Draw with the pointer</small></span></button>
     </div>
 
+    <!--
+      Stamp rows are JavaScript render targets. Standard presets are rebuilt
+      from source constants; saved presets are rebuilt from browser storage.
+      Leave both containers empty here to avoid duplicate static entries.
+    -->
     <div class="stamp-menu" id="stampMenu" hidden>
       <div class="stamp-menu-heading"><strong>Stamp</strong><span>Standard and saved stamps</span><kbd class="tool-shortcut">S</kbd></div>
       <div class="stamp-preset-grid" id="standardStampPresets" aria-label="Standard stamps"></div>
@@ -137,6 +148,7 @@
       <div class="stamp-preset-grid saved" id="savedStampPresets"></div>
       <p class="stamp-empty" id="savedStampEmpty">No custom stamps are saved.</p>
       <div class="stamp-menu-actions"><button type="button" id="customTextStampButton"><span class="ui-icon icon-type" aria-hidden="true"></span>Custom text</button><button type="button" id="customImageStampButton"><span class="ui-icon icon-image" aria-hidden="true"></span>Image stamp</button></div>
+      <!-- Image Stamp and Image Markup share this picker; app.js tracks its pending purpose. -->
       <input id="stampImageFileInput" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden />
     </div>
 
@@ -149,6 +161,7 @@
     -->
     <main class="workspace">
       <aside class="sidebar" id="sidebar">
+        <!-- Keyboard focus lets arrow-key and Enter handling resize or collapse this panel. -->
         <div class="panel-resizer panel-resizer-right" id="sidebarResizer" role="separator" aria-label="Resize left panel" aria-orientation="vertical" tabindex="0"></div>
         <!--
           This is a real ARIA tab interface. Each tab's `aria-controls` points
@@ -163,6 +176,7 @@
           <button id="toolChestTab" type="button" role="tab" aria-selected="false" aria-controls="toolChestPanel" data-sidebar-tab="tool-chest" title="Tool Chest"><span class="ui-icon icon-toolbox" aria-hidden="true"></span><span>Tool Chest</span></button>
           <button id="takeoffTab" type="button" role="tab" aria-selected="false" aria-controls="takeoffPanel" data-sidebar-tab="takeoff" title="Takeoff Summary and Live Legends"><span class="ui-icon icon-list" aria-hidden="true"></span><small class="sidebar-live-badge" aria-hidden="true">Live</small><span>Takeoff Summary</span></button>
         </div>
+        <!-- Page controls act on checked pages, or current page when none are checked. -->
         <section class="sidebar-panel active" id="pagesPanel" role="tabpanel" aria-labelledby="pagesTab">
           <div class="sidebar-heading"><span>Pages</span><span id="pageCount">1 page</span></div>
           <div class="page-selection-bar"><label><input id="selectAllPages" type="checkbox" /><span id="pageSelectionStatus">Current page</span></label></div>
@@ -176,8 +190,10 @@
           </div>
           <input id="replacePagesInput" type="file" accept="application/pdf,.pdf" hidden />
           <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
+          <!-- app.js creates thumbnail canvases, labels, checkboxes, and reorder controls here. -->
           <div id="thumbnails" class="thumbnails"></div>
         </section>
+        <!-- Search results are generated from PDF text content, never hard-coded here. -->
         <section class="sidebar-panel" id="searchPanel" role="tabpanel" aria-labelledby="searchTab" hidden>
           <div class="sidebar-heading"><span>Search</span><span id="searchResultCount">0 results</span></div>
           <form class="document-search-form" id="documentSearchForm" role="search">
@@ -190,6 +206,7 @@
           <ol class="document-search-results" id="documentSearchResults"></ol>
           <p class="sidebar-empty" id="documentSearchEmpty" hidden>No matching text was found.</p>
         </section>
+        <!-- Bookmark nodes are rendered as an accessible tree by app.js. -->
         <section class="sidebar-panel" id="bookmarksPanel" role="tabpanel" aria-labelledby="bookmarksTab" hidden>
           <div class="sidebar-heading"><span>Bookmarks</span><span id="bookmarkCount">0 bookmarks</span></div>
           <button class="insert-page-button" id="addBookmarkButton" type="button" disabled><span class="ui-icon icon-plus" aria-hidden="true"></span>Add current page</button>
@@ -197,12 +214,14 @@
           <p class="sidebar-empty" id="bookmarksEmpty">Open a PDF, then add a bookmark for the current page.</p>
           <p class="sidebar-note">Bookmarks use standard PDF destinations. Unsupported external actions are not imported.</p>
         </section>
+        <!-- Layer rows contain visibility, lock, print, rename, and delete controls. -->
         <section class="sidebar-panel" id="layersPanel" role="tabpanel" aria-labelledby="layersTab" hidden>
           <div class="sidebar-heading"><span>Layers</span><span id="layerCount">0 layers</span></div>
           <button class="insert-page-button" id="addLayerButton" type="button"><span class="ui-icon icon-plus" aria-hidden="true"></span>Add layer</button>
           <div class="layer-list" id="layerList"></div>
           <p class="sidebar-empty" id="layersEmpty">This document has no layers. New items use no layer.</p>
         </section>
+        <!-- Tool Chest contents live in browser storage and are rendered into this empty list. -->
         <section class="sidebar-panel" id="toolChestPanel" role="tabpanel" aria-labelledby="toolChestTab" hidden>
           <div class="sidebar-heading"><span>Tool Chest</span><span id="toolChestCount">0 tools</span></div>
           <div class="tool-chest-actions"><button id="saveSelectedTool" type="button" disabled><span class="ui-icon icon-plus" aria-hidden="true"></span>Save selected</button><button id="importBtxToolChestButton" type="button" title="Best-effort import from a Bluebeam BTX tool set.">BTX</button><button id="importJsonToolChestButton" type="button" title="Import a Bluebeam Killer JSON tool set.">JSON</button><button id="exportToolChestButton" type="button" disabled><span class="ui-icon icon-download" aria-hidden="true"></span>Export</button></div>
@@ -211,6 +230,7 @@
           <p class="sidebar-empty" id="toolChestEmpty">Save a selected item, or import a Bluebeam BTX or Bluebeam Killer JSON tool set.</p>
           <p class="sidebar-note">The current BTX converter might not convert all Bluebeam tools correctly. Check imported tools before use. Files stay in this browser.</p>
         </section>
+        <!-- Takeoff rows recalculate from current measurements whenever markup state changes. -->
         <section class="sidebar-panel" id="takeoffPanel" role="tabpanel" aria-labelledby="takeoffTab" hidden>
           <div class="sidebar-heading"><span class="takeoff-title">Takeoff Summary <small class="live-feature-badge">Live</small></span><span id="takeoffGroupCount">0 groups</span></div>
           <div class="takeoff-controls">
@@ -233,6 +253,14 @@
         attaches event handlers directly to them and updates their state.
       -->
       <section class="editor markups-collapsed">
+        <!--
+          TOOLBAR RESPONSIVE MODEL
+
+          `edit-toolbar-row` owns normal tool order. app.js measures available width
+          and moves lower-priority controls into `toolbarOverflowMenu`. Values
+          in `data-toolbar-overflow` decide which controls move first. Original
+          nodes move between containers; JavaScript never duplicates them.
+        -->
         <nav class="toolbar" aria-label="PDF editing tools">
           <div class="edit-toolbar-row">
             <div class="tool-group toolbar-primary">
@@ -297,8 +325,10 @@
             <button class="tool" data-tool="stamp" id="stampButton" data-toolbar-overflow="105" data-overflow-label="Stamp" title="Open stamp tools. Press S for quick placement." aria-keyshortcuts="S" aria-haspopup="menu" aria-controls="stampMenu" aria-expanded="false"><span class="ui-icon icon-stamp" aria-hidden="true"></span>Stamp</button>
             <button class="snap-toggle toolbar-snap" id="snapToContentButton" type="button" data-toolbar-overflow="100" data-overflow-label="Snap" aria-pressed="false" aria-label="Snap measurements to PDF vector content" title="Snap measurements to PDF vector content" disabled><span class="ui-icon icon-magnet" aria-hidden="true"></span><span class="snap-label">Snap</span></button>
             </div>
+            <!-- Highlight colors appear only while Highlight mode is active. -->
             <div class="highlight-palette" id="highlightPalette" data-toolbar-overflow="90" aria-label="Highlight color" hidden><span>Color</span><button style="--highlight:#ffd84d" data-highlight-color="#ffd84d" class="selected" aria-label="Yellow highlight"></button><button style="--highlight:#86e59d" data-highlight-color="#86e59d" aria-label="Green highlight"></button><button style="--highlight:#7cc8ff" data-highlight-color="#7cc8ff" aria-label="Blue highlight"></button><button style="--highlight:#ff9fc6" data-highlight-color="#ff9fc6" aria-label="Pink highlight"></button><button style="--highlight:#ffb66e" data-highlight-color="#ffb66e" aria-label="Orange highlight"></button><button style="--highlight:#c4a8ff" data-highlight-color="#c4a8ff" aria-label="Purple highlight"></button><input id="highlightToolCustom" type="color" value="#ffd84d" aria-label="Custom highlight color" title="Custom highlight color" /></div>
             <div class="divider" id="toolbarDivider"></div>
+            <!-- Compact actions operate on history or current selection. -->
             <div class="tool-group compact">
             <button class="icon-button" id="undoButton" data-toolbar-overflow="80" data-overflow-label="Undo" title="Undo (Ctrl+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z" disabled><span class="ui-icon icon-undo" aria-hidden="true"></span></button>
             <button class="icon-button" id="redoButton" data-toolbar-overflow="70" data-overflow-label="Redo" title="Redo (Ctrl+Y)" aria-label="Redo" aria-keyshortcuts="Control+Y" disabled><span class="ui-icon icon-redo" aria-hidden="true"></span></button>
@@ -318,12 +348,15 @@
               Do not duplicate overflow candidates in this menu—the same DOM
               nodes are moved here and later restored to their placeholders.
             -->
+            <!-- Hidden until width calculation moves at least one control here. -->
             <button class="icon-button toolbar-overflow-button" id="toolbarOverflowButton" type="button" aria-label="More editing tools" aria-haspopup="menu" aria-expanded="false" title="More editing tools" hidden><span class="ui-icon icon-ellipsis" aria-hidden="true"></span></button>
             <div class="toolbar-overflow-menu" id="toolbarOverflowMenu" role="menu" aria-label="More editing tools" hidden></div>
+            <!-- Zoom changes PDF scale while surrounding application chrome stays fixed. -->
             <div class="zoom-controls">
               <button id="zoomOut" aria-label="Zoom out"><span class="ui-icon icon-minus" aria-hidden="true"></span></button><span id="zoomValue">100%</span><button id="zoomIn" aria-label="Zoom in"><span class="ui-icon icon-plus" aria-hidden="true"></span></button>
             </div>
           </div>
+          <!-- Split-button menus stay here so CSS can anchor them below toolbar toggles. -->
           <div class="select-tool-menu" id="selectToolMenu" role="menu" aria-label="Select tool options" hidden>
             <button data-selection-tool="select" type="button" role="menuitemradio" title="Select added items (V)" aria-keyshortcuts="V" aria-checked="true"><span class="ui-icon icon-pointer" aria-hidden="true"></span><span><strong>Select</strong><small>Select and move added items</small></span><kbd class="tool-shortcut">V</kbd><span class="select-tool-check" aria-hidden="true">&#10003;</span></button>
             <button data-selection-tool="lasso" type="button" role="menuitemradio" title="Lasso select added items (Shift+V)" aria-keyshortcuts="Shift+V" aria-checked="false"><span class="ui-icon icon-lasso" aria-hidden="true"></span><span><strong>Lasso</strong><small>Draw around added items</small></span><kbd class="tool-shortcut">Shift+V</kbd><span class="select-tool-check" aria-hidden="true">&#10003;</span></button>
@@ -345,6 +378,13 @@
           Do not swap their order: pointer and selection behavior relies on it.
         -->
         <div class="canvas-area" id="canvasArea">
+          <!--
+            EMPTY DOCUMENT STATE
+
+            This content is visible before a PDF opens. Drop-zone copy teaches
+            drag-and-drop, while `emptyOpenButton` gives keyboard and touch
+            users access to the same picker as the header Open button.
+          -->
           <div class="empty-state" id="emptyState">
             <div class="empty-badge">PDF</div>
             <h1>Review, mark up, and measure PDFs in your browser.</h1>
@@ -364,14 +404,18 @@
             </div>
             <span>Everything stays on your device.</span>
           </div>
+          <!-- `pageStage` becomes visible after PDF.js accepts an opened file. -->
           <div class="page-stage" id="pageStage" hidden>
             <div class="page-shell" id="pageShell">
+              <!-- PDF.js paints original page pixels into this canvas. -->
               <canvas id="pdfCanvas"></canvas>
+              <!-- Keep layer order stable: PDF text, saved objects, temporary drafts. -->
               <div id="textLayer" class="text-layer"></div>
               <div id="annotationLayer" class="annotation-layer"></div>
               <div id="drawLayer" class="draw-layer"></div>
             </div>
           </div>
+          <!-- Pointer hints announce guidance without moving keyboard focus. -->
           <div class="cursor-tool-hint" id="cursorToolHint" role="status" aria-live="polite" hidden></div>
         </div>
 
@@ -385,9 +429,11 @@
         <section class="markups-panel panel-collapsed" id="markupsPanel" aria-label="Markups List">
           <div class="panel-resizer panel-resizer-top" id="markupsPanelResizer" role="separator" aria-label="Resize, expand, or collapse Markups List" aria-orientation="horizontal" aria-expanded="false" title="Click to expand." tabindex="0"><span class="panel-resizer-grip" aria-hidden="true"></span></div>
           <div class="markups-panel-heading"><strong>Markups List</strong><input id="markupsFilter" type="search" placeholder="Filter markups" aria-label="Filter markups" /><label class="markups-group-control">Group<select id="markupsGroupBy" aria-label="Group Markups List"><option value="">None</option><option value="page">Page</option><option value="layer">Layer</option><option value="type">Type</option><option value="subject">Subject</option><option value="value">Value</option><option value="status">Status</option><option value="comment">Comment</option></select></label><button id="exportMarkupsCsv" type="button"><span class="ui-icon icon-download" aria-hidden="true"></span>CSV</button><button id="closeMarkupsList" type="button" aria-label="Close Markups List"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+          <!-- Header buttons select sort columns; app.js generates matching body rows. -->
           <div class="markups-table-wrap"><table><thead id="markupsTableHead"><tr><th class="visibility-column"><input id="markupsVisibilityAll" type="checkbox" aria-label="Show or hide all items" title="Show or hide all items" checked /></th><th><button data-sort-key="page">Page</button></th><th><button data-sort-key="layer">Layer</button></th><th><button data-sort-key="type">Type</button></th><th><button data-sort-key="subject">Subject</button></th><th><button data-sort-key="value">Value</button></th><th><button data-sort-key="author">Author</button></th><th><button data-sort-key="status">Status</button></th><th><button data-sort-key="comment">Comment</button></th><th><button data-sort-key="created">Created</button></th><th><button data-sort-key="modified">Modified</button></th></tr></thead><tbody id="markupsTableBody"></tbody></table><p class="markups-empty" id="markupsEmpty">There are no markups in this document.</p></div>
         </section>
 
+        <!-- Footer combines page navigation, fitting, layout modes, and privacy status. -->
         <footer class="statusbar">
           <div class="page-navigation"><button id="prevPage" aria-label="Previous page"><span class="ui-icon icon-chevron-left" aria-hidden="true"></span></button><span>Page <input id="pageInput" value="1" inputmode="numeric" aria-label="Current page" /> of <b id="totalPages">1</b></span><span class="original-page-number" id="originalPageNumber" hidden></span><button id="nextPage" aria-label="Next page"><span class="ui-icon icon-chevron-right" aria-hidden="true"></span></button></div>
           <div class="page-layout-control" id="pageLayoutControls" aria-label="Page view controls">
@@ -412,8 +458,17 @@
         Many groups start hidden because they only apply to certain item types.
       -->
       <aside class="inspector" id="inspector">
+        <!-- Separator supports pointer resizing, keyboard resizing, and click collapse. -->
         <div class="panel-resizer panel-resizer-left" id="inspectorResizer" role="separator" aria-label="Resize or collapse properties panel" aria-orientation="vertical" aria-expanded="true" title="Drag to resize. Click to collapse." tabindex="0"><span class="panel-resizer-grip" aria-hidden="true"></span></div>
+        <!-- Empty message is replaced by exactly one inspector state after selection. -->
         <div class="inspector-empty" id="inspectorEmpty"><span class="ui-icon icon-file" aria-hidden="true"></span><strong>No item selected</strong><p>Select an annotation to change its style.</p></div>
+        <!--
+          MULTIPLE-SELECTION PROPERTIES
+
+          app.js reveals only property groups supported by current selection.
+          `__mixed__` option means selected objects currently disagree; choosing
+          a real value applies it to every compatible, unlocked object.
+        -->
         <div class="inspector-content batch-properties" id="batchProperties" hidden>
           <div class="inspector-title"><span><strong>Multiple selection</strong><small>Properties</small></span><button id="closeBatchInspector" data-inspector-navigation aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <div class="batch-selection-summary"><strong id="batchSelectionCount">Multiple items selected</strong><small>Changes apply to compatible unlocked items.</small></div>
@@ -524,6 +579,13 @@
             </div>
           </details>
         </div>
+        <!--
+          SINGLE-SELECTION PROPERTIES
+
+          This outer container is shared. JavaScript shows one inner editor for
+          text, Sticky Notes, measurements, or drawing markups. Keeping every
+          editor mounted makes direct ID lookups predictable and inexpensive.
+        -->
         <div class="inspector-content" id="inspectorContent" hidden>
           <div class="inspector-title"><span><strong id="inspectorSelectionKind">Selected item</strong><small>Properties</small></span><button id="closeInspector" data-inspector-navigation aria-label="Close properties"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <!--
@@ -539,6 +601,7 @@
               <label id="selectedRotationField" hidden>Rotation<input id="selectedRotation" type="number" min="0" max="359" step="1" value="0" /><small>Enter an angle from 0 to 359 degrees. Hold Shift while you drag the handle to use 15-degree steps.</small></label>
             </div>
           </details>
+          <!-- Inserted text and replaced PDF text share these typography controls. -->
           <div id="textProperties">
             <details class="property-section" id="textContentSection" open>
               <summary>Text</summary>
@@ -572,6 +635,7 @@
             </details>
             <p class="edit-note" id="editNote">Export removes original text from edited pages. Edited and inserted text stays sharp and selectable.</p>
           </div>
+          <!-- Sticky Notes expose note text, author, review status, and colour. -->
           <div class="sticky-note-properties" id="stickyNoteProperties" hidden>
             <div class="measurement-kind">Sticky Note</div>
             <details class="property-section" open>
@@ -598,6 +662,7 @@
               </div>
             </details>
           </div>
+          <!-- Measurement controls depend on measurement kind and calibrated page scale. -->
           <div class="measurement-properties" id="measurementProperties" hidden>
             <div class="measurement-kind" id="measurementKind">Length measurement</div>
             <details class="property-section" open>
@@ -619,6 +684,7 @@
               </div>
             </details>
           </div>
+          <!-- Markup editor swaps content fields for flags, callouts, legends, and images. -->
           <div class="markup-properties" id="markupProperties" hidden>
             <div class="measurement-kind" id="markupKind">Drawing markup</div>
             <details class="property-section" id="markupContentSection" open hidden>
@@ -694,6 +760,7 @@
             </details>
           </div>
         </div>
+        <!-- Defaults save style for future items, never selected item's geometry or text. -->
         <div class="item-default-controls" id="itemDefaultControls" hidden>
           <div><strong id="itemDefaultName">Item defaults</strong><small id="itemDefaultStatus">This item type uses the built-in default.</small></div>
           <div class="item-default-actions"><button class="button secondary" id="resetItemDefault" type="button" title="Restore the built-in properties for this item type.">Reset default</button><button class="button primary" id="setItemDefault" type="button" title="Use these properties for new items of this type.">Set as default</button></div>
@@ -707,6 +774,7 @@
       calls `showModal()` / `close()` rather than imitating a modal with plain
       divs. Keep each dialog title ID aligned with `aria-labelledby`.
     -->
+    <!-- Advanced selection combines filters, then replaces, adds, or removes matches. -->
     <dialog class="selection-filter-dialog" id="selectionFilterDialog" aria-labelledby="selectionFilterTitle">
       <div class="selection-filter-heading"><div><span>Advanced selection</span><h2 id="selectionFilterTitle">Select by properties</h2></div><button id="closeSelectionFilter" type="button" aria-label="Close selection filters"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <p>Choose one page and combine the filters. Hidden items are ignored. Locked items can be selected.</p>
@@ -721,6 +789,7 @@
         <div class="selection-filter-actions"><button class="button secondary" id="cancelSelectionFilter" type="button" title="Close this panel without changing the selection.">Cancel</button><button class="button secondary" id="removeSelectionFilter" type="button" title="Keep the current selection, but remove all matching items from it.">Remove</button><button class="button secondary" id="addSelectionFilter" type="button" title="Keep the current selection and add all matching items to it.">Add</button><button class="button primary" id="replaceSelectionFilter" type="button" title="Clear the current selection, then select all matching items.">Select matches</button></div>
       </div>
     </dialog>
+    <!-- Shortcut guide duplicates active keyboard mappings for discoverability. -->
     <dialog class="shortcut-dialog" id="shortcutDialog" aria-labelledby="shortcutTitle">
       <div class="shortcut-heading"><div><span>Reference guide</span><h2 id="shortcutTitle">Keyboard shortcuts</h2></div><button id="closeShortcutDialog" aria-label="Close keyboard shortcuts"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <div class="shortcut-sections">
@@ -732,6 +801,7 @@
         <section><h3>Edit and view</h3><dl><div><dt>Select all added page objects</dt><dd><kbd>Ctrl+A</kbd></dd></div><div><dt>Add or remove one item from selection</dt><dd><kbd>Ctrl</kbd> + click</dd></div><div><dt>Group / ungroup selected items</dt><dd><kbd>Ctrl+G</kbd> / <kbd>Ctrl+Shift+G</kbd></dd></div><div><dt>Move selected items</dt><dd><kbd>Arrow keys</kbd></dd></div><div><dt>Move selected items by 10 units</dt><dd><kbd>Shift</kbd> + <kbd>Arrow</kbd></dd></div><div><dt>Undo / redo</dt><dd><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></dd></div><div><dt>Copy selected item</dt><dd><kbd>Ctrl+C</kbd></dd></div><div><dt>Paste at mouse pointer</dt><dd><kbd>Ctrl+V</kbd></dd></div><div><dt>Paste in the original location</dt><dd><kbd>Ctrl+Shift+V</kbd></dd></div><div><dt>Format Painter</dt><dd><kbd>Ctrl+Shift+C</kbd></dd></div><div><dt>Delete selected item</dt><dd><kbd>Delete</kbd></dd></div><div><dt>Zoom in / out</dt><dd><kbd>+</kbd> / <kbd>-</kbd></dd></div><div><dt>Pan document</dt><dd><kbd>Space</kbd> + drag</dd></div><div><dt>Fit width / page</dt><dd><kbd>Ctrl+0</kbd> / <kbd>Ctrl+9</kbd></dd></div><div><dt>Actual size</dt><dd><kbd>Ctrl+8</kbd></dd></div><div><dt>Page layouts</dt><dd><kbd>Ctrl+4</kbd> - <kbd>Ctrl+7</kbd></dd></div><div><dt>Show this guide</dt><dd><kbd>F1</kbd></dd></div></dl></section>
       </div>
     </dialog>
+    <!-- Settings change browser-local preferences; they do not modify opened PDF bytes. -->
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
       <div class="settings-heading"><div><span>Preferences</span><h2 id="settingsTitle">Settings</h2></div><button id="closeSettings" type="button" aria-label="Close settings"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
           <div class="settings-body">
@@ -745,12 +815,14 @@
         <p class="settings-storage-note">Preferences and recovery data are stored in this browser. They are not included in exported PDFs.</p>
       </div>
     </dialog>
+    <!-- Recovery summary identifies local IndexedDB work before restore or deletion. -->
     <dialog class="recovery-dialog" id="recoveryDialog" aria-labelledby="recoveryDialogTitle">
       <div class="recovery-dialog-heading"><div><span>Local recovery</span><h2 id="recoveryDialogTitle">Restore saved work?</h2></div><button id="keepRecoveryButton" type="button" aria-label="Close recovery options"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <p>The app found unfinished document work in this browser. Check the document name and save time before you restore it.</p>
       <dl class="recovery-summary"><div><dt>Document</dt><dd id="recoveryDocumentName">Untitled.pdf</dd></div><div><dt>Saved</dt><dd id="recoverySavedAt">—</dd></div><div><dt>Pages</dt><dd id="recoveryPageCount">0</dd></div><div><dt>Added items</dt><dd id="recoveryItemCount">0</dd></div></dl>
       <div class="recovery-actions"><button class="button secondary" id="deleteRecovery" type="button">Delete saved data</button><button class="button secondary" id="keepRecovery" type="button">Keep for later</button><button class="button primary" id="restoreRecovery" type="button">Restore saved work</button></div>
     </dialog>
+    <!-- Export mode is explicit because flattened output cannot restore editable items. -->
     <dialog class="export-dialog" id="exportDialog" aria-labelledby="exportDialogTitle">
       <div class="export-dialog-heading"><div><span>Export PDF</span><h2 id="exportDialogTitle">Choose an export type</h2></div><button id="cancelExport" type="button" aria-label="Close export options"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
       <p>Editable annotations can be selected in Bluebeam and other PDF editors. Flattened graphics keep the current fixed appearance.</p>
@@ -759,6 +831,7 @@
         <button type="button" data-export-mode="flattened"><span class="export-choice-icon ui-icon icon-file" aria-hidden="true"></span><span><strong>Flattened PDF</strong><small>Place all changes in the page content. These items cannot be selected as markups.</small></span></button>
       </div>
     </dialog>
+    <!-- Scale dialog serves both two-point calibration and saved-ratio workflows. -->
     <dialog class="scale-dialog" id="scaleDialog" aria-labelledby="scaleDialogTitle">
       <form id="scaleForm">
         <div class="scale-dialog-heading"><span class="ui-icon icon-crosshair" aria-hidden="true"></span><div><strong id="scaleDialogTitle">Set drawing scale</strong><small id="scaleDialogDescription">Enter the real distance between the two selected points.</small></div></div>
@@ -789,6 +862,7 @@
         <div class="scale-dialog-actions"><button class="button secondary" id="cancelFormBoxDetection" type="button">Cancel</button><button class="button primary" id="confirmFormBoxDetection" type="submit">Scan all pages</button></div>
       </form>
     </dialog>
+    <!-- Toast is one shared, non-blocking status target for short app messages. -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <!--
       Load the module last so every element above exists before app.js performs
