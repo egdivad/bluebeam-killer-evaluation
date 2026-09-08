@@ -8,12 +8,12 @@
     "src": "favicon.svg"
   },
   "index.html": {
-    "file": "assets/index-SrlZNlJz.js",
+    "file": "assets/index-FD7nqxdp.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
     "css": [
-      "assets/index-BGw8emFA.css"
+      "assets/index-fBRn_FNa.css"
     ],
     "assets": [
       "assets/pdf.worker.min-yatZIOMy.mjs",
