@@ -53,8 +53,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-BwJ4CTUt.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-icguJ8cK.css">
+    <script type="module" crossorigin src="./assets/index-SrlZNlJz.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BGw8emFA.css">
   </head>
   <body>
     <!--
@@ -189,7 +189,12 @@
             <button id="extractPages" type="button" title="Export selected pages to a new editable PDF" disabled><span class="ui-icon icon-file-output" aria-hidden="true"></span><span>Extract</span></button>
           </div>
           <input id="replacePagesInput" type="file" accept="application/pdf,.pdf" hidden />
-          <button class="insert-page-button" id="insertPageButton" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Insert blank page</button>
+          <!-- Add PDF accepts several sources. app.js inspects them before opening the merge dialog. -->
+          <input id="addPdfInput" type="file" accept="application/pdf,.pdf" multiple hidden />
+          <div class="page-insert-actions">
+            <button class="insert-page-button" id="addPdfButton" type="button"><span class="ui-icon icon-files" aria-hidden="true"></span>Add PDF</button>
+            <button class="insert-page-button" id="insertPageButton" type="button" aria-keyshortcuts="Control+Shift+N"><span class="ui-icon icon-plus" aria-hidden="true"></span>Blank page</button>
+          </div>
           <!-- app.js creates thumbnail canvases, labels, checkboxes, and reorder controls here. -->
           <div id="thumbnails" class="thumbnails"></div>
         </section>
@@ -821,6 +826,19 @@
       <p>The app found unfinished document work in this browser. Check the document name and save time before you restore it.</p>
       <dl class="recovery-summary"><div><dt>Document</dt><dd id="recoveryDocumentName">Untitled.pdf</dd></div><div><dt>Saved</dt><dd id="recoverySavedAt">—</dd></div><div><dt>Pages</dt><dd id="recoveryPageCount">0</dd></div><div><dt>Added items</dt><dd id="recoveryItemCount">0</dd></div></dl>
       <div class="recovery-actions"><button class="button secondary" id="deleteRecovery" type="button">Delete saved data</button><button class="button secondary" id="keepRecovery" type="button">Keep for later</button><button class="button primary" id="restoreRecovery" type="button">Restore saved work</button></div>
+    </dialog>
+    <!-- Merge review prevents large or wrongly ordered files changing the document silently. -->
+    <dialog class="pdf-merge-dialog" id="pdfMergeDialog" aria-labelledby="pdfMergeDialogTitle">
+      <div class="pdf-merge-heading"><div><span>Pages</span><h2 id="pdfMergeDialogTitle">Add PDF pages</h2></div><button id="closePdfMerge" type="button" aria-label="Close Add PDF"><span class="ui-icon icon-x" aria-hidden="true"></span></button></div>
+      <p>Review file order and page counts before changing the open document.</p>
+      <div class="pdf-merge-body">
+        <div class="pdf-merge-summary"><strong id="pdfMergeSummary">No PDF files ready</strong><button class="button secondary" id="addMorePdfFiles" type="button">Add files</button></div>
+        <!-- File rows receive Move up, Move down, and Remove controls from app.js. -->
+        <ol class="pdf-merge-files" id="pdfMergeFiles" aria-label="PDF files to add"></ol>
+        <label class="pdf-merge-position">Insert pages<select id="pdfMergePosition"><option value="after">After selected or current page</option><option value="before">Before selected or current page</option><option value="end">At document end</option><option value="drop" hidden>At dropped position</option></select></label>
+        <p class="pdf-merge-feedback" id="pdfMergeFeedback" role="status" aria-live="polite"></p>
+        <div class="pdf-merge-actions"><button class="button secondary" id="cancelPdfMerge" type="button">Cancel</button><button class="button primary" id="confirmPdfMerge" type="button">Add pages</button></div>
+      </div>
     </dialog>
     <!-- Export mode is explicit because flattened output cannot restore editable items. -->
     <dialog class="export-dialog" id="exportDialog" aria-labelledby="exportDialogTitle">
