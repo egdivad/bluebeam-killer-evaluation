@@ -53,8 +53,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-BiWHC01z.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-fBRn_FNa.css">
+    <script type="module" crossorigin src="./assets/index-BHmuO84V.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-UlNW70-I.css">
   </head>
   <body>
     <!--
@@ -816,8 +816,32 @@
         <section><h3>Interface</h3><label>Default page layout<select id="settingsPageLayout"><option value="single">Single page</option><option value="continuous">Continuous pages</option><option value="side">Side-by-side</option><option value="continuous-side">Continuous side-by-side</option></select></label><label class="settings-check"><input id="settingsSnapDefault" type="checkbox" /> Enable vector snap when the app opens</label><label class="settings-check"><input id="settingsCursorHints" type="checkbox" /> Show delayed tool hints near the cursor</label><button class="button secondary" id="resetPanelLayout" type="button" title="Restore the original panel sizes and expanded states.">Reset panel layout</button></section>
         <section><h3>Import and export</h3><p>Move preferences to another browser or computer with a JSON file.</p><div class="settings-actions"><button class="button secondary" id="importPreferences" type="button" title="Import and replace the preferences in this browser.">Import preferences</button><button class="button secondary" id="exportPreferences" type="button" title="Download all preferences as a JSON file.">Export preferences</button></div><input id="preferenceFileInput" type="file" accept="application/json,.json" hidden /></section>
         <section><h3>Local recovery</h3><p id="recoverySettingsStatus">Checking for saved work…</p><small class="recovery-settings-details" id="recoverySettingsDetails">The app saves the current open document after a change.</small><div class="settings-actions"><button class="button secondary" id="restoreRecoveryButton" type="button" title="Open the latest document work saved in this browser." disabled>Restore saved work</button><button class="button secondary" id="deleteRecoveryButton" type="button" title="Delete saved document recovery data from this browser." disabled>Delete saved data</button></div></section>
+        <!-- Release announcements remain accessible after startup dismissal. -->
+        <section><h3>What's New</h3><p id="whatsNewSettingsSummary">Latest release improvements.</p><button class="button secondary" id="openWhatsNew" type="button" title="Read the latest release notes and change their startup visibility.">What's New</button></section>
         <section class="settings-danger"><h3>Reset</h3><p>Restore all app preferences and item defaults.</p><button class="button secondary" id="resetAllPreferences" type="button" title="Restore every preference to its built-in value.">Reset all preferences</button></section>
         <p class="settings-storage-note">Preferences and recovery data are stored in this browser. They are not included in exported PDFs.</p>
+      </div>
+    </dialog>
+    <!--
+      Release-aware startup dialog. app.js fills these text-only placeholders
+      from bundled public JSON, after any Local Recovery prompt finishes.
+      Native dialog supplies modal focus containment and Escape-to-close.
+      Only the body scrolls; header and footer stay reachable on small screens.
+    -->
+    <dialog class="whats-new-dialog" id="whatsNewDialog" aria-labelledby="whatsNewTitle">
+      <div class="whats-new-heading">
+        <div><span>Latest release</span><h2 id="whatsNewTitle" tabindex="-1">What's New</h2></div>
+        <button id="closeWhatsNew" type="button" aria-label="Close What's New"><span class="ui-icon icon-x" aria-hidden="true"></span></button>
+      </div>
+      <div class="whats-new-body">
+        <time id="whatsNewDate"></time><!-- datetime is assigned from the release calendar date. -->
+        <h3 id="whatsNewReleaseTitle"></h3>
+        <ul id="whatsNewHighlights"></ul><!-- Each highlight uses textContent, never injected HTML. -->
+        <p class="whats-new-reminder">You can read these notes again in Settings.</p>
+      </div>
+      <div class="whats-new-footer">
+        <label class="whats-new-check"><input id="dismissWhatsNewRelease" type="checkbox" /><span>Don't show this release again<small>New releases will still appear.</small></span></label>
+        <button class="button primary" id="acknowledgeWhatsNew" type="button">Got it</button>
       </div>
     </dialog>
     <!-- Recovery summary identifies local IndexedDB work before restore or deletion. -->
