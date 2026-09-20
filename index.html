@@ -53,8 +53,8 @@
       validates and manages the same preference in more detail.
     -->
     <script>try{const saved=JSON.parse(localStorage.getItem("bluebeam-killer-preferences")||"null"),choice=saved?.theme||localStorage.getItem("bluebeam-killer-theme")||"system";document.documentElement.dataset.theme=choice==="system"?((window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"):choice;}catch{document.documentElement.dataset.theme="light";}</script>
-    <script type="module" crossorigin src="./assets/index-j3l6zJGK.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-UlNW70-I.css">
+    <script type="module" crossorigin src="./assets/index-XtMI8eZv.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CX4v_gbR.css">
   </head>
   <body>
     <!--
@@ -638,7 +638,7 @@
                 <label>Align selected item to page<div class="page-alignment-options" id="pageAlignment" role="group" aria-label="Align selected item to page"><button data-page-align="center"><span class="page-align-icon icon-page-center" aria-hidden="true"></span><span>Page center</span></button><button data-page-align="vertical"><span class="page-align-icon icon-vertical-center" aria-hidden="true"></span><span>Vertical center</span></button><button data-page-align="horizontal"><span class="page-align-icon icon-horizontal-center" aria-hidden="true"></span><span>Horizontal center</span></button><button data-page-align="left"><span class="page-align-icon icon-page-left" aria-hidden="true"></span><span>Page left</span></button><button data-page-align="right"><span class="page-align-icon icon-page-right" aria-hidden="true"></span><span>Page right</span></button><button data-page-align="top"><span class="page-align-icon icon-page-top" aria-hidden="true"></span><span>Page top</span></button><button data-page-align="bottom"><span class="page-align-icon icon-page-bottom" aria-hidden="true"></span><span>Page bottom</span></button></div></label>
               </div>
             </details>
-            <p class="edit-note" id="editNote">Export removes original text from edited pages. Edited and inserted text stays sharp and selectable.</p>
+            <p class="edit-note" id="editNote">Source PDF text stays vector-based. A small cover hides edited text visually; original text remains searchable underneath. Exported replacement text stays sharp and selectable.</p>
           </div>
           <!-- Sticky Notes expose note text, author, review status, and colour. -->
           <div class="sticky-note-properties" id="stickyNoteProperties" hidden>
